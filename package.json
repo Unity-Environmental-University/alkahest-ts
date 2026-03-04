@@ -1,0 +1,35 @@
+{
+  "name": "alkahest-ts",
+  "version": "0.1.0",
+  "description": "A universal solvent: the Otter theorem-prover loop in TypeScript, with pluggable domains",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "dev": "tsc --watch"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Unity-Environmental-University/alkahest-ts.git"
+  },
+  "author": "Hallie Larsson",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Unity-Environmental-University/alkahest-ts/issues"
+  },
+  "homepage": "https://github.com/Unity-Environmental-University/alkahest-ts#readme",
+  "devDependencies": {
+    "@types/node": "^25.3.3",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
+  }
+}
