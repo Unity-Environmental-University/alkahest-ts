@@ -57,6 +57,27 @@ export interface StepRecord {
  * A domain bundles everything the Otter loop needs to run.
  * Implement this interface to define a new domain.
  */
+/**
+ * Three states of matter for type dissolution.
+ *
+ * Volatile (gas)  — always re-precipitates. Source stays = Volatile.
+ *                   Generated output is overwritten every decohere run.
+ *
+ * Fluid (liquid)  — precipitates once, re-flows only if tsc breaks.
+ *                   Stable until the world shifts under it.
+ *
+ * Salt (solid)    — precipitates once, replaces itself in-place.
+ *                   The marker is consumed. It's just TypeScript now.
+ *
+ * Use `= Phase` for total dissolution, `extends Phase` to pin fields.
+ */
+export interface Volatile {}
+export interface Fluid {}
+export interface Salt {}
+
+/** @deprecated Use Volatile, Fluid, or Salt */
+export type Alkahest = Volatile
+
 export interface OtterDomain<T extends OtterItem = OtterItem> {
   initialState: () => OtterState<T>
   combineFn: (focus: T, other: T) => T[]
