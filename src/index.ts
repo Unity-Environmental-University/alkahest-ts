@@ -19,6 +19,10 @@ export { createGraph, addNode, addEdge, edgesFrom, edgesTo, parallax } from "./g
 export type { Frame, Observation } from "./frames.js"
 export { accumulateConfidence, observerParallax, observationPhase, CONFIDENCE_CEILING } from "./frames.js"
 
+// Quantum superposition
+export type { QuantumBasis, QuantumItem, Complex } from "./quantum.js"
+export { complex, add, mul, abs, absSquared, definite, superpose, totalWeight, quantumCombine, amplitudeMap } from "./quantum.js"
+
 // Entropy / flow
 export type { FlowState, ViscosityFactors, ExtendedPhase } from "./entropy.js"
 export {
