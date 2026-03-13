@@ -445,37 +445,48 @@ const GRAPH = {
 
 // ── Radial force-directed layout ─────────────────────────
 
-// Soft ring radii — used as attraction targets, not hard constraints
-const RING_R = [80, 195, 270]
-const NODE_R = [26, 22, 18]
-const CX = 330, CY = 330
+const CX = CW / 2
+const CY = CH / 2
+const PADDING    = 48                                      // min px from canvas edge
+const MAX_R      = Math.min(CX, CY) - PADDING             // usable radius from center
+const RING_R     = [MAX_R * 0.25, MAX_R * 0.60, MAX_R * 0.92]  // ring attraction radii
+const NODE_R     = [26, 22, 18]                            // visual node sizes
+const NODE_GAP   = MAX_R / GRAPH.nodes.length             // avg space per node arc
+const REPULSION  = NODE_GAP * NODE_GAP * 18               // Coulomb constant scales with density
+const SPRING_K   = 0.014                                   // spring stiffness
+const RING_K     = 0.20                                    // ring attraction strength
+const STEP_SIZE  = 0.010                                   // Euler dt per iteration
+
+// Edge ideal lengths: scale with ring separation
+const RING_SEP   = RING_R[1] - RING_R[0]
+const IDEAL_TREE = RING_SEP * 1.1                          // adjacent-ring edges
+const IDEAL_CROSS= RING_R[1] * 0.75                       // cross-cut (same-layer)
 
 function computeLayout() {
-  // Seed evenly around rings
+  // Seed: place each node at its ring radius, evenly spaced by angle
   const byRing = [[], [], []]
   for (const n of GRAPH.nodes) byRing[n.ring].push(n)
   for (const ring of byRing) {
     ring.forEach((n, i) => {
       const a = (i / ring.length) * 2 * Math.PI - Math.PI / 2
-      const r = RING_R[n.ring]
-      n.px = CX + r * Math.cos(a)
-      n.py = CY + r * Math.sin(a)
+      n.px = CX + RING_R[n.ring] * Math.cos(a)
+      n.py = CY + RING_R[n.ring] * Math.sin(a)
       n.vx = 0; n.vy = 0
     })
   }
 
-  for (let iter = 0; iter < 400; iter++) {
+  for (let iter = 0; iter < 500; iter++) {
     const fx = new Map(GRAPH.nodes.map(n => [n.id, 0]))
     const fy = new Map(GRAPH.nodes.map(n => [n.id, 0]))
 
-    // Node-node repulsion (2D Coulomb)
+    // Node–node repulsion (Coulomb)
     for (let i = 0; i < GRAPH.nodes.length; i++) {
       for (let j = i + 1; j < GRAPH.nodes.length; j++) {
         const a = GRAPH.nodes[i], b = GRAPH.nodes[j]
         const dx = a.px - b.px, dy = a.py - b.py
-        const d2 = dx * dx + dy * dy + 1
+        const d2 = Math.max(dx * dx + dy * dy, 1)
         const d  = Math.sqrt(d2)
-        const f  = 3200 / d2
+        const f  = REPULSION / d2
         fx.set(a.id, fx.get(a.id) + f * dx / d)
         fy.set(a.id, fy.get(a.id) + f * dy / d)
         fx.set(b.id, fx.get(b.id) - f * dx / d)
@@ -489,51 +500,46 @@ function computeLayout() {
       const b = GRAPH.nodes.find(n => n.id === edge.to)
       const dx = b.px - a.px, dy = b.py - a.py
       const d  = Math.sqrt(dx * dx + dy * dy) + 0.01
-      const ideal = edge.crossCut ? 200 : 140
-      const f  = (d - ideal) * 0.012
+      const ideal = edge.crossCut ? IDEAL_CROSS : IDEAL_TREE
+      const f  = (d - ideal) * SPRING_K
       fx.set(a.id, fx.get(a.id) + f * dx / d)
       fy.set(a.id, fy.get(a.id) + f * dy / d)
       fx.set(b.id, fx.get(b.id) - f * dx / d)
       fy.set(b.id, fy.get(b.id) - f * dy / d)
     }
 
-    // Soft ring constraint — pull toward ring radius
+    // Soft ring constraint — pull toward target ring radius
     for (const n of GRAPH.nodes) {
       const dx = n.px - CX, dy = n.py - CY
       const d  = Math.sqrt(dx * dx + dy * dy) + 0.01
       const diff = d - RING_R[n.ring]
-      fx.set(n.id, fx.get(n.id) - diff * (dx / d) * 0.18)
-      fy.set(n.id, fy.get(n.id) - diff * (dy / d) * 0.18)
+      fx.set(n.id, fx.get(n.id) - diff * (dx / d) * RING_K)
+      fy.set(n.id, fy.get(n.id) - diff * (dy / d) * RING_K)
     }
 
-    const damp = 0.82
+    // Integrate with damping
+    const damp = iter < 300 ? 0.80 : 0.92   // cool down near end
     for (const n of GRAPH.nodes) {
       n.vx = (n.vx + fx.get(n.id)) * damp
       n.vy = (n.vy + fy.get(n.id)) * damp
-      n.px += n.vx * 0.012
-      n.py += n.vy * 0.012
-      const m = NODE_R[n.ring] + 8
-      n.px = Math.max(m, Math.min(CW - m, n.px))
-      n.py = Math.max(m, Math.min(CH - m, n.py))
+      n.px += n.vx * STEP_SIZE
+      n.py += n.vy * STEP_SIZE
     }
   }
 
-  // Re-center: shift bounding-box center to (CX, CY) and re-clamp
+  // Final centering: shift bounding-box midpoint to (CX, CY)
   const minX = Math.min(...GRAPH.nodes.map(n => n.px))
   const maxX = Math.max(...GRAPH.nodes.map(n => n.px))
   const minY = Math.min(...GRAPH.nodes.map(n => n.py))
   const maxY = Math.max(...GRAPH.nodes.map(n => n.py))
-  const shiftX = CX - (minX + maxX) / 2
-  const shiftY = CY - (minY + maxY) / 2
+  const offX = CX - (minX + maxX) / 2
+  const offY = CY - (minY + maxY) / 2
+  const margin = NODE_R[2] + PADDING / 2
   for (const n of GRAPH.nodes) {
-    n.px += shiftX
-    n.py += shiftY
-    const m = NODE_R[n.ring] + 8
-    n.px = Math.max(m, Math.min(CW - m, n.px))
-    n.py = Math.max(m, Math.min(CH - m, n.py))
+    n.px = Math.max(margin, Math.min(CW - margin, n.px + offX))
+    n.py = Math.max(margin, Math.min(CH - margin, n.py + offY))
+    n.r  = NODE_R[n.ring]
   }
-
-  for (const n of GRAPH.nodes) n.r = NODE_R[n.ring]
 }
 
 computeLayout()
