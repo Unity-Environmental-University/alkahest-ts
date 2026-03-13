@@ -518,6 +518,11 @@ function computeLayout() {
     }
   }
 
+  // Re-center: force-directed drift can shift center of mass away from (CX, CY)
+  const avgX = GRAPH.nodes.reduce((s, n) => s + n.px, 0) / GRAPH.nodes.length
+  const avgY = GRAPH.nodes.reduce((s, n) => s + n.py, 0) / GRAPH.nodes.length
+  for (const n of GRAPH.nodes) { n.px += CX - avgX; n.py += CY - avgY }
+
   for (const n of GRAPH.nodes) n.r = NODE_R[n.ring]
 }
 

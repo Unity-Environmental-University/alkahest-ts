@@ -27,9 +27,10 @@ export interface ThermalNode {
 }
 
 export interface ThermalEdge {
-  from: string   // dependency
-  to: string     // dependent (heat flows this direction)
-  conductance: number  // 0–1, how much heat transfers along this edge
+  from: string       // dependency
+  to: string         // dependent (heat flows this direction)
+  conductance: number
+  crossCut?: boolean // cross-subsystem edge — symmetric, medium conductance
 }
 
 export interface ThermalGraph {
@@ -70,35 +71,54 @@ export function emitHeat(graph: ThermalGraph, nodeId: string, kind: HeatEventKin
   node.temperature += HEAT_EMISSION[kind]
 }
 
-/**
- * One CA propagation step.
- * Each node receives heat from its dependencies, scaled by conductance and a global decay.
- * Run after emitting heat for a changelog step.
- */
-export function propagate(graph: ThermalGraph, decay: number = 0.6): void {
-  const delta = new Map<string, number>()
+// ── Fourier heat equation on a graph ────────────────────
+// dT_i/dt = Σ_j κ_ij (T_j - T_i) - λ·T_i
+//
+// Exchange term is conservative: energy leaving one node enters neighbors.
+// λ term drains energy to environment (changelog cooling).
+// Asymmetric conductance: heat flows more easily downstream than back up.
+
+const LAMBDA   = 0.08  // cooling rate (loss to environment per step)
+const DT       = 0.4   // Euler time-step
+const SUBSTEPS = 4     // substeps per changelog tick for numerical stability
+
+function edgeConductance(edge: ThermalEdge, forward: boolean): number {
+  if (edge.crossCut) return 0.55
+  return forward ? edge.conductance : edge.conductance * 0.3
+}
+
+function fourierStep(graph: ThermalGraph, dt: number): void {
+  const dT = new Map<string, number>()
+  for (const id of graph.nodes.keys()) dT.set(id, 0)
 
   for (const edge of graph.edges) {
-    const source = graph.nodes.get(edge.from)
-    if (!source || source.temperature <= 0) continue
-    const transferred = source.temperature * edge.conductance * decay
-    delta.set(edge.to, (delta.get(edge.to) ?? 0) + transferred)
+    const Ti = graph.nodes.get(edge.from)?.temperature ?? 0
+    const Tj = graph.nodes.get(edge.to)?.temperature   ?? 0
+    const kFwd = edgeConductance(edge, true)
+    const kBwd = edgeConductance(edge, false)
+    // Forward flux: from → to
+    dT.set(edge.to,   (dT.get(edge.to)   ?? 0) + kFwd * (Ti - Tj) * dt)
+    dT.set(edge.from, (dT.get(edge.from) ?? 0) - kFwd * (Ti - Tj) * dt)
+    // Backward flux: to → from
+    dT.set(edge.from, (dT.get(edge.from) ?? 0) + kBwd * (Tj - Ti) * dt)
+    dT.set(edge.to,   (dT.get(edge.to)   ?? 0) - kBwd * (Tj - Ti) * dt)
   }
 
-  for (const [id, heat] of delta) {
+  for (const [id, delta] of dT) {
     const node = graph.nodes.get(id)
-    if (node) node.temperature += heat
+    if (!node) continue
+    const cooling = LAMBDA * node.temperature * dt
+    node.temperature = Math.max(0, node.temperature + delta - cooling)
   }
 }
 
 /**
- * Cool all nodes by one changelog step.
- * Temperature decays toward zero; never goes negative.
+ * One changelog step of Fourier heat diffusion.
+ * Energy is conserved between nodes; λ drains slowly to environment.
  */
-export function cool(graph: ThermalGraph, coolingRate: number = 0.4): void {
-  for (const node of graph.nodes.values()) {
-    node.temperature = Math.max(0, node.temperature - coolingRate)
-  }
+export function propagate(graph: ThermalGraph): void {
+  const dt = DT / SUBSTEPS
+  for (let i = 0; i < SUBSTEPS; i++) fourierStep(graph, dt)
 }
 
 export interface ChangelogEvent {
@@ -107,19 +127,16 @@ export interface ChangelogEvent {
 }
 
 /**
- * Process one changelog step (one commit's worth of changes).
- * Emits heat for all events, propagates, then cools.
+ * Process one changelog step: emit heat for events, then diffuse.
  */
 export function thermalStep(
   graph: ThermalGraph,
   events: ChangelogEvent[],
-  opts: { decay?: number; coolingRate?: number } = {},
 ): void {
   for (const event of events) {
     emitHeat(graph, event.nodeId, event.kind)
   }
-  propagate(graph, opts.decay)
-  cool(graph, opts.coolingRate)
+  propagate(graph)
 }
 
 /** Build a ThermalGraph from a flat node/edge description */

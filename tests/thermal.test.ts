@@ -4,7 +4,6 @@ import {
   effectivePhase,
   emitHeat,
   propagate,
-  cool,
   thermalStep,
   snapshot,
   defaultThresholds,
@@ -139,21 +138,33 @@ describe("propagate", () => {
   })
 })
 
-describe("cool", () => {
-  it("reduces all temperatures", () => {
+describe("cooling", () => {
+  it("temperatures decrease over multiple thermalStep calls with no events", () => {
     const g = makeGraph()
     emitHeat(g, "core-types", "salt-type-change")
     emitHeat(g, "parser", "fluid-recompile")
     const before = g.nodes.get("core-types")!.temperature
-    cool(g)
+    thermalStep(g, [])
     expect(g.nodes.get("core-types")!.temperature).toBeLessThan(before)
   })
 
   it("does not go below zero", () => {
     const g = makeGraph()
-    cool(g, 999)
+    for (let i = 0; i < 50; i++) thermalStep(g, [])
     for (const node of g.nodes.values()) {
       expect(node.temperature).toBeGreaterThanOrEqual(0)
+    }
+  })
+
+  it("total energy decreases monotonically between steps with no input", () => {
+    const g = makeGraph()
+    emitHeat(g, "core-types", "salt-type-change")
+    let prevTotal = Array.from(g.nodes.values()).reduce((s, n) => s + n.temperature, 0)
+    for (let i = 0; i < 10; i++) {
+      thermalStep(g, [])
+      const total = Array.from(g.nodes.values()).reduce((s, n) => s + n.temperature, 0)
+      expect(total).toBeLessThanOrEqual(prevTotal)
+      prevTotal = total
     }
   })
 })
@@ -168,9 +179,9 @@ describe("thermalStep", () => {
   it("repeated steps with no events cool the graph to zero", () => {
     const g = makeGraph()
     thermalStep(g, [{ nodeId: "core-types", kind: "salt-type-change" }])
-    for (let i = 0; i < 20; i++) thermalStep(g, [])
+    for (let i = 0; i < 100; i++) thermalStep(g, [])
     for (const node of g.nodes.values()) {
-      expect(node.temperature).toBe(0)
+      expect(node.temperature).toBeLessThan(0.1)
     }
   })
 
@@ -178,7 +189,7 @@ describe("thermalStep", () => {
     const g = makeGraph()
     // Hammer core-types with salt changes across several changelog steps
     for (let i = 0; i < 8; i++) {
-      thermalStep(g, [{ nodeId: "core-types", kind: "salt-type-change" }], { decay: 0.9, coolingRate: 0.1 })
+      thermalStep(g, [{ nodeId: "core-types", kind: "salt-type-change" }])
     }
     const cli = g.nodes.get("cli")!
     expect(effectivePhase(cli)).toBe("volatile")
