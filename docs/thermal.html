@@ -624,11 +624,9 @@ function propagate() {
 }
 
 // ── Shape morphing ───────────────────────────────────────
-// Shapes: 0=square(salt), 1=teardrop(fluid), 2=cloud(volatile)
-// shapeBlend returns a continuous 0–2 value from temperature
-
+// Shapes: 0=square(salt), 1=teardrop(fluid), 2=cloud(volatile), 3=glass(amorphous)
 // Shape = effective phase (what it's doing). Border = intrinsic phase (what it is).
-const PHASE_SHAPE = { salt: 0, fluid: 1, volatile: 2 }
+const PHASE_SHAPE = { salt: 0, fluid: 1, volatile: 2, glass: 3 }
 
 function shapeBlend(node) { return PHASE_SHAPE[effectivePhase(node)] }
 
@@ -649,7 +647,17 @@ function cloudR(theta, R) {
   return R * (1 + 0.20 * Math.cos(3 * theta) + 0.07 * Math.cos(6 * theta + 1.0))
 }
 
+function glassR(theta, R) {
+  // Almost-square but with irregular perturbations — frozen wrong, no crystal structure
+  // Lp base like salt but with incommensurate frequency noise to break the symmetry
+  const p = 5
+  const c = Math.abs(Math.cos(theta)), s = Math.abs(Math.sin(theta))
+  const base = R / Math.pow(c**p + s**p, 1/p)
+  return base * (1 + 0.06 * Math.cos(7 * theta) + 0.04 * Math.cos(11 * theta + 2.3))
+}
+
 function blendedR(theta, R, t) {
+  if (t === 3) return glassR(theta, R)
   if (t <= 1) {
     return squareR(theta, R) * (1 - t) + teardropR(theta, R) * t
   } else {
@@ -686,6 +694,7 @@ const PHASE_COLORS = {
   salt:     { r: 107, g: 83,  b: 68  },
   fluid:    { r: 27,  g: 122, b: 104 },
   volatile: { r: 217, g: 79,  b: 42  },
+  glass:    { r: 140, g: 155, b: 170 },  // cool blue-grey — frozen, opaque
 }
 
 function tempColor(node) {
