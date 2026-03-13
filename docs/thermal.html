@@ -527,22 +527,24 @@ function computeLayout() {
     }
   }
 
-  // Final centering: shift bounding-box midpoint to (CX, CY)
-  const minX = Math.min(...GRAPH.nodes.map(n => n.px))
-  const maxX = Math.max(...GRAPH.nodes.map(n => n.px))
-  const minY = Math.min(...GRAPH.nodes.map(n => n.py))
-  const maxY = Math.max(...GRAPH.nodes.map(n => n.py))
-  const offX = CX - (minX + maxX) / 2
-  const offY = CY - (minY + maxY) / 2
-  const margin = NODE_R[2] + PADDING / 2
-  for (const n of GRAPH.nodes) {
-    n.px = Math.max(margin, Math.min(CW - margin, n.px + offX))
-    n.py = Math.max(margin, Math.min(CH - margin, n.py + offY))
-    n.r  = NODE_R[n.ring]
+  for (const n of GRAPH.nodes) n.r = NODE_R[n.ring]
+}
+
+// Compute draw-time translation so graph centroid renders at canvas center.
+// Called once after layout; draw() applies it via ctx.save/translate/restore.
+function graphOffset() {
+  const xs = GRAPH.nodes.map(n => n.px)
+  const ys = GRAPH.nodes.map(n => n.py)
+  const minX = Math.min(...xs), maxX = Math.max(...xs)
+  const minY = Math.min(...ys), maxY = Math.max(...ys)
+  return {
+    x: CX - (minX + maxX) / 2,
+    y: CY - (minY + maxY) / 2,
   }
 }
 
 computeLayout()
+const OFFSET = graphOffset()
 
 // ── Thermal model ────────────────────────────────────────
 
@@ -693,8 +695,8 @@ function tempColor(node) {
 
 function draw() {
   ctx.clearRect(0, 0, CW, CH)
-
-  // (no ring guides)
+  ctx.save()
+  ctx.translate(OFFSET.x, OFFSET.y)
 
   // Edges
   for (const edge of GRAPH.edges) {
@@ -798,7 +800,9 @@ function draw() {
     ctx.fillText(`${node.temperature.toFixed(1)}°`, cx, cy + R + 8)
   }
 
-  // Commit counter
+  ctx.restore()
+
+  // Commit counter — fixed position, outside translation
   ctx.fillStyle = '#A08070'
   ctx.font = '11px ui-monospace, monospace'
   ctx.textAlign = 'left'
@@ -892,7 +896,10 @@ function canvasCoords(e) {
   const scaleY = CH / rect.height
   const clientX = e.touches ? e.touches[0].clientX : e.clientX
   const clientY = e.touches ? e.touches[0].clientY : e.clientY
-  return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY }
+  return {
+    x: (clientX - rect.left) * scaleX - OFFSET.x,
+    y: (clientY - rect.top)  * scaleY - OFFSET.y,
+  }
 }
 
 function hitNode(x, y) {
