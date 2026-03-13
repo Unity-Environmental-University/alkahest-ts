@@ -601,18 +601,10 @@ function propagate() {
 // Shapes: 0=square(salt), 1=teardrop(fluid), 2=cloud(volatile)
 // shapeBlend returns a continuous 0–2 value from temperature
 
-// Base shape per intrinsic phase: salt=0 (square), fluid=1 (teardrop), volatile=1.6 (cloud)
-const PHASE_BASE = { salt: 0, fluid: 1, volatile: 1.6 }
+// Fixed shape per intrinsic phase — no morphing
+const PHASE_SHAPE = { salt: 0, fluid: 1, volatile: 2 }
 
-function shapeBlend(node) {
-  const base = PHASE_BASE[node.phase]
-  const T    = node.temperature
-  if (T <= 0) return base
-  const mp = node.meltingPoint, bp = node.boilingPoint
-  // Temperature pushes shape toward 2 (full cloud) from its base
-  const tFrac = T < mp ? T / mp * 0.5 : 0.5 + (T - mp) / (bp - mp) * 0.5
-  return Math.min(2, base + tFrac * (2 - base))
-}
+function shapeBlend(node) { return PHASE_SHAPE[node.phase] }
 
 function squareR(theta, R) {
   // Lp-norm with p=6 gives a smooth rounded square
