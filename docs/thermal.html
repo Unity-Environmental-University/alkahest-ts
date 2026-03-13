@@ -446,7 +446,7 @@ const GRAPH = {
 // ── Radial force-directed layout ─────────────────────────
 
 // Soft ring radii — used as attraction targets, not hard constraints
-const RING_R = [100, 230, 310]
+const RING_R = [80, 195, 270]
 const NODE_R = [26, 22, 18]
 const CX = 330, CY = 330
 
@@ -518,10 +518,20 @@ function computeLayout() {
     }
   }
 
-  // Re-center: force-directed drift can shift center of mass away from (CX, CY)
-  const avgX = GRAPH.nodes.reduce((s, n) => s + n.px, 0) / GRAPH.nodes.length
-  const avgY = GRAPH.nodes.reduce((s, n) => s + n.py, 0) / GRAPH.nodes.length
-  for (const n of GRAPH.nodes) { n.px += CX - avgX; n.py += CY - avgY }
+  // Re-center: shift bounding-box center to (CX, CY) and re-clamp
+  const minX = Math.min(...GRAPH.nodes.map(n => n.px))
+  const maxX = Math.max(...GRAPH.nodes.map(n => n.px))
+  const minY = Math.min(...GRAPH.nodes.map(n => n.py))
+  const maxY = Math.max(...GRAPH.nodes.map(n => n.py))
+  const shiftX = CX - (minX + maxX) / 2
+  const shiftY = CY - (minY + maxY) / 2
+  for (const n of GRAPH.nodes) {
+    n.px += shiftX
+    n.py += shiftY
+    const m = NODE_R[n.ring] + 8
+    n.px = Math.max(m, Math.min(CW - m, n.px))
+    n.py = Math.max(m, Math.min(CH - m, n.py))
+  }
 
   for (const n of GRAPH.nodes) n.r = NODE_R[n.ring]
 }
