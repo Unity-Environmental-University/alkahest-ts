@@ -134,7 +134,7 @@ body {
 .event-btn.salt-event:hover { background: var(--coral); color: white; box-shadow: 0 3px 14px rgba(217,79,42,.22); }
 .event-btn.fluid-event { border-color: var(--teal); color: var(--teal); }
 .event-btn.fluid-event:hover { background: var(--teal); color: white; box-shadow: 0 3px 14px rgba(27,122,104,.22); }
-.event-btn.step-btn { margin-left: auto; border-color: var(--axis); color: var(--ink-mid); }
+.event-btn.step-btn { border-color: var(--axis); color: var(--ink-mid); }
 .event-btn.step-btn:hover { border-color: var(--ink); color: var(--ink); }
 .event-btn.reset-btn { border-color: var(--grid); color: var(--ink-light); }
 .event-btn.reset-btn:hover { border-color: var(--axis); color: var(--ink-mid); }
@@ -235,16 +235,16 @@ hr.full { max-width: none; }
     That heat doesn't stay put.
   </p>
   <p>
-    Heat flows <em>outward through the dependency graph</em> — from things others depend on, toward the things that depend on them.
-    A locked-in core node has high thermal mass: lots of dependents, high boiling point.
-    Edge nodes — with nothing depending on them — are low mass. They absorb heat easily and boil first.
+    Heat diffuses along the graph according to the <em>Fourier heat equation</em> — flowing from hot nodes toward cool neighbors, proportional to the temperature gradient.
+    Energy is conserved between nodes: heat that leaves one node enters its neighbors.
+    It flows more strongly downstream (dependency → dependent) than back up, but some always flows back.
   </p>
   <p class="pull">The more locked in place something is, the further its heat can dissipate to the edges.</p>
   <p>
-    And it cools over time — not clock time, but <em>changelog time</em>.
-    Each commit that passes without touching a node lets it cool a little more.
-    Leave something alone for long enough and it crystallizes back toward salt behavior,
-    regardless of what it is.
+    The only true energy loss is cooling — proportional to temperature, each commit step.
+    Hot nodes cool faster. Cold nodes are already at rest.
+    Leave something untouched long enough and it crystallizes back toward salt behavior,
+    regardless of what material it is.
   </p>
 </div>
 
@@ -255,22 +255,21 @@ hr.full { max-width: none; }
   <div class="section-label">The cellular automaton</div>
   <h2>Watch the heat move</h2>
   <p class="sim-intro">
-    A hypothetical shmup codebase. Four salt roots: <strong>entity-schema</strong>, <strong>sprite-atlas</strong>, <strong>mvc-base</strong>, <strong>enemy-schema</strong>, <strong>level-schema</strong>.
-    Heat flows outward toward volatile leaves. Cross-cut edges <span style="color:var(--brass)">——</span> connect subsystems.
-    Fire an event, step commits, watch the cascade.
+    A hypothetical shmup. Salt roots at the center, volatile leaves at the rim. Tap any node to fire a heat event — salts release more. Hit ▶ Play to run changelog time. Brass arcs are cross-cut edges — heat jumping subsystem boundaries.
   </p>
 
   <div class="sim-wrap">
     <div class="sim-controls">
-      <button class="event-btn step-btn" onclick="stepCommit()">Commit →</button>
+      <button class="event-btn step-btn" id="playBtn" onclick="togglePlay()">▶ Play</button>
+      <button class="event-btn step-btn" onclick="stepCommit()">Step</button>
       <button class="event-btn reset-btn" onclick="resetSim()">Reset</button>
-      <span class="sim-hint-inline">Tap a node to fire a heat event</span>
+      <span class="sim-hint-inline">Tap a node to heat it</span>
     </div>
-    <canvas id="simCanvas" width="940" height="860"></canvas>
+    <canvas id="simCanvas" width="660" height="660"></canvas>
     <div class="sim-log" id="simLog">
       <div class="log-entry step">Ready. Fire a heat event or step through commits.</div>
     </div>
-    <div class="sim-hint">Color = effective phase right now. Border = intrinsic phase (solid salt · dashed fluid · dotted volatile). Brass dashed lines are cross-cut edges — heat jumps subsystem boundaries.</div>
+    <div class="sim-hint">Color = effective phase right now. Border = intrinsic phase (solid salt · dashed fluid · dotted volatile). Brass dashed arcs are cross-cut edges — heat jumps subsystem boundaries.</div>
   </div>
 </div>
 
@@ -299,23 +298,33 @@ hr.full { max-width: none; }
     <tbody>
       <tr>
         <td>Salt type change</td>
-        <td>2.5</td>
+        <td>+2.5</td>
         <td>Crystalline structures release energy violently when broken</td>
       </tr>
       <tr>
         <td>Fluid recompile / break</td>
-        <td>1.0</td>
+        <td>+1.0</td>
         <td>Fluids are already in motion — less energy to shift them</td>
       </tr>
       <tr>
-        <td>Propagation decay</td>
-        <td>× 0.6 per edge</td>
-        <td>Heat attenuates as it travels — distant nodes warm less</td>
+        <td>κ downstream (dependency→dependent)</td>
+        <td>0.8</td>
+        <td>Changes propagate strongly toward dependents</td>
       </tr>
       <tr>
-        <td>Cooling per commit</td>
-        <td>− 0.4</td>
-        <td>Changelog time: each untouched commit lets a node cool</td>
+        <td>κ upstream (dependent→dependency)</td>
+        <td>0.25</td>
+        <td>Some heat flows back — a hot leaf warms its parent a little</td>
+      </tr>
+      <tr>
+        <td>κ cross-cut edge</td>
+        <td>0.55</td>
+        <td>Subsystem boundaries conduct at medium rate, both ways</td>
+      </tr>
+      <tr>
+        <td>λ cooling per commit</td>
+        <td>0.08 × T</td>
+        <td>Proportional loss to environment — hot nodes cool faster</td>
       </tr>
     </tbody>
   </table>
@@ -376,102 +385,99 @@ hr.full { max-width: none; }
 <script>
 // ── Graph definition ────────────────────────────────────
 
-const CW = 940, CH = 860, R = 24
+const CW = 660, CH = 660
 
-const NODES_DEF = [
-  // Entity / Player tree
-  { id: 'entity-schema',      label: ['entity','schema'],   phase: 'salt',     px: 55,  py: 175 },
-  { id: 'entity-manager',     label: ['entity','mgr'],      phase: 'fluid',    px: 190, py: 175 },
-  { id: 'player',             label: ['player'],            phase: 'fluid',    px: 335, py: 95  },
-  { id: 'input-handler',      label: ['input','handler'],   phase: 'volatile', px: 485, py: 48  },
-  { id: 'weapon-system',      label: ['weapon','system'],   phase: 'fluid',    px: 485, py: 112 },
-  { id: 'bullet-pool',        label: ['bullet','pool'],     phase: 'volatile', px: 640, py: 85  },
-  { id: 'shield-system',      label: ['shield','system'],   phase: 'fluid',    px: 485, py: 175 },
-  { id: 'hit-detection',      label: ['hit','detect'],      phase: 'volatile', px: 640, py: 175 },
-  { id: 'enemy-spawner',      label: ['enemy','spawner'],   phase: 'fluid',    px: 335, py: 258 },
-  { id: 'formation-patterns', label: ['formation','patt.'], phase: 'fluid',    px: 485, py: 248 },
-  { id: 'wave-controller',    label: ['wave','ctrl'],       phase: 'volatile', px: 640, py: 248 },
-  { id: 'enemy-ai',           label: ['enemy','ai'],        phase: 'fluid',    px: 485, py: 305 },
-  // Render tree
-  { id: 'render-pipeline',    label: ['render','pipeline'], phase: 'fluid',    px: 335, py: 378 },
-  { id: 'sprite-atlas',       label: ['sprite','atlas'],    phase: 'salt',     px: 485, py: 352 },
-  { id: 'animation-system',   label: ['anim','system'],     phase: 'fluid',    px: 640, py: 352 },
-  { id: 'hud',                label: ['hud'],               phase: 'fluid',    px: 485, py: 415 },
-  { id: 'score-display',      label: ['score','display'],   phase: 'volatile', px: 640, py: 410 },
-  { id: 'health-bar',         label: ['health','bar'],      phase: 'volatile', px: 640, py: 455 },
-  // Shared MVC base
-  { id: 'shared-mvc-base',    label: ['mvc','base'],        phase: 'salt',     px: 55,  py: 535 },
-  { id: 'base-model',         label: ['base','model'],      phase: 'fluid',    px: 190, py: 505 },
-  { id: 'base-view',          label: ['base','view'],       phase: 'fluid',    px: 190, py: 545 },
-  { id: 'base-controller',    label: ['base','ctrl'],       phase: 'fluid',    px: 190, py: 585 },
-  // Enemy MVC
-  { id: 'enemy-schema',       label: ['enemy','schema'],    phase: 'salt',     px: 55,  py: 668 },
-  { id: 'enemy-registry',     label: ['registry'],          phase: 'fluid',    px: 190, py: 668 },
-  { id: 'grunt',              label: ['grunt'],             phase: 'fluid',    px: 335, py: 532 },
-  { id: 'grunt-model',        label: ['grunt','model'],     phase: 'fluid',    px: 485, py: 522 },
-  { id: 'carrier',            label: ['carrier'],           phase: 'fluid',    px: 335, py: 628 },
-  { id: 'carrier-model',      label: ['carrier','model'],   phase: 'fluid',    px: 485, py: 618 },
-  { id: 'minion-spawner',     label: ['minion','spawn'],    phase: 'volatile', px: 640, py: 618 },
-  { id: 'boss',               label: ['boss'],              phase: 'fluid',    px: 335, py: 722 },
-  { id: 'boss-model',         label: ['boss','model'],      phase: 'fluid',    px: 485, py: 708 },
-  { id: 'phase-tracker',      label: ['phase','tracker'],   phase: 'fluid',    px: 640, py: 698 },
-  { id: 'phase-transition',   label: ['phase','tx'],        phase: 'volatile', px: 795, py: 698 },
-  // Level tree
-  { id: 'level-schema',       label: ['level','schema'],    phase: 'salt',     px: 55,  py: 792 },
-  { id: 'level-loader',       label: ['level','loader'],    phase: 'fluid',    px: 190, py: 770 },
-  { id: 'level-state',        label: ['level','state'],     phase: 'fluid',    px: 190, py: 818 },
-  { id: 'score-tracker',      label: ['score','tracker'],   phase: 'fluid',    px: 335, py: 818 },
-]
+const GRAPH = {
+  nodes: [
+    // ring 0 — salt roots at center cluster
+    { id: 'entity-schema',   label: 'entity\nschema',  phase: 'salt',     ring: 0, sector: 0   },
+    { id: 'sprite-atlas',    label: 'sprite\natlas',   phase: 'salt',     ring: 0, sector: 72  },
+    { id: 'shared-mvc-base', label: 'mvc\nbase',       phase: 'salt',     ring: 0, sector: 144 },
+    { id: 'enemy-schema',    label: 'enemy\nschema',   phase: 'salt',     ring: 0, sector: 216 },
+    { id: 'level-schema',    label: 'level\nschema',   phase: 'salt',     ring: 0, sector: 288 },
 
-const EDGES_DEF = [
-  { from: 'entity-schema',      to: 'entity-manager'     },
-  { from: 'entity-schema',      to: 'render-pipeline'    },
-  { from: 'entity-manager',     to: 'player'             },
-  { from: 'entity-manager',     to: 'enemy-spawner'      },
-  { from: 'player',             to: 'input-handler'      },
-  { from: 'player',             to: 'weapon-system'      },
-  { from: 'player',             to: 'shield-system'      },
-  { from: 'weapon-system',      to: 'bullet-pool'        },
-  { from: 'shield-system',      to: 'hit-detection'      },
-  { from: 'enemy-spawner',      to: 'formation-patterns' },
-  { from: 'enemy-spawner',      to: 'enemy-ai'           },
-  { from: 'formation-patterns', to: 'wave-controller'    },
-  { from: 'render-pipeline',    to: 'sprite-atlas'       },
-  { from: 'render-pipeline',    to: 'hud'                },
-  { from: 'sprite-atlas',       to: 'animation-system'   },
-  { from: 'hud',                to: 'score-display'      },
-  { from: 'hud',                to: 'health-bar'         },
-  { from: 'shared-mvc-base',    to: 'base-model'         },
-  { from: 'shared-mvc-base',    to: 'base-view'          },
-  { from: 'shared-mvc-base',    to: 'base-controller'    },
-  { from: 'enemy-schema',       to: 'enemy-registry'     },
-  { from: 'enemy-registry',     to: 'grunt'              },
-  { from: 'enemy-registry',     to: 'carrier'            },
-  { from: 'enemy-registry',     to: 'boss'               },
-  { from: 'grunt',              to: 'grunt-model'        },
-  { from: 'carrier',            to: 'carrier-model'      },
-  { from: 'boss',               to: 'boss-model'         },
-  { from: 'carrier-model',      to: 'minion-spawner'     },
-  { from: 'boss-model',         to: 'phase-tracker'      },
-  { from: 'phase-tracker',      to: 'phase-transition'   },
-  { from: 'level-schema',       to: 'level-loader'       },
-  { from: 'level-schema',       to: 'level-state'        },
-  { from: 'level-state',        to: 'score-tracker'      },
-  // Cross-cut
-  { from: 'level-loader',  to: 'wave-controller', crossCut: true },
-  { from: 'score-tracker', to: 'score-display',   crossCut: true },
-  { from: 'base-model',    to: 'grunt-model',     crossCut: true },
-  { from: 'base-model',    to: 'carrier-model',   crossCut: true },
-  { from: 'base-model',    to: 'boss-model',      crossCut: true },
-]
+    // ring 1 — fluid mid-layer
+    { id: 'entity-manager',  label: 'entity\nmgr',     phase: 'fluid',    ring: 1, sector: 340 },
+    { id: 'render-pipeline', label: 'render\npipeline',phase: 'fluid',    ring: 1, sector: 40  },
+    { id: 'animation-system',label: 'anim\nsystem',    phase: 'fluid',    ring: 1, sector: 80  },
+    { id: 'hud',             label: 'hud',             phase: 'fluid',    ring: 1, sector: 112 },
+    { id: 'base-model',      label: 'base\nmodel',     phase: 'fluid',    ring: 1, sector: 150 },
+    { id: 'enemy-registry',  label: 'enemy\nregistry', phase: 'fluid',    ring: 1, sector: 195 },
+    { id: 'boss',            label: 'boss',            phase: 'fluid',    ring: 1, sector: 230 },
+    { id: 'boss-model',      label: 'boss\nmodel',     phase: 'fluid',    ring: 1, sector: 260 },
+    { id: 'level-loader',    label: 'level\nloader',   phase: 'fluid',    ring: 1, sector: 300 },
+    { id: 'level-state',     label: 'level\nstate',    phase: 'fluid',    ring: 1, sector: 320 },
+
+    // ring 2 — volatile rim
+    { id: 'input-handler',   label: 'input',           phase: 'volatile', ring: 2, sector: 330 },
+    { id: 'bullet-pool',     label: 'bullets',         phase: 'volatile', ring: 2, sector: 355 },
+    { id: 'health-bar',      label: 'health\nbar',     phase: 'volatile', ring: 2, sector: 100 },
+    { id: 'score-display',   label: 'score',           phase: 'volatile', ring: 2, sector: 120 },
+    { id: 'phase-transition',label: 'phase\ntx',       phase: 'volatile', ring: 2, sector: 250 },
+    { id: 'wave-controller', label: 'wave\nctrl',      phase: 'volatile', ring: 2, sector: 280 },
+    { id: 'score-tracker',   label: 'score\ntracker',  phase: 'volatile', ring: 2, sector: 308 },
+  ],
+  edges: [
+    // tree edges
+    { from: 'entity-schema',   to: 'entity-manager'  },
+    { from: 'entity-schema',   to: 'render-pipeline' },
+    { from: 'entity-manager',  to: 'input-handler'   },
+    { from: 'entity-manager',  to: 'bullet-pool'     },
+    { from: 'sprite-atlas',    to: 'animation-system'},
+    { from: 'render-pipeline', to: 'animation-system'},
+    { from: 'render-pipeline', to: 'hud'             },
+    { from: 'hud',             to: 'health-bar'      },
+    { from: 'hud',             to: 'score-display'   },
+    { from: 'shared-mvc-base', to: 'base-model'      },
+    { from: 'enemy-schema',    to: 'enemy-registry'  },
+    { from: 'enemy-registry',  to: 'boss'            },
+    { from: 'boss',            to: 'boss-model'      },
+    { from: 'boss-model',      to: 'phase-transition'},
+    { from: 'level-schema',    to: 'level-loader'    },
+    { from: 'level-schema',    to: 'level-state'     },
+    { from: 'level-state',     to: 'score-tracker'   },
+    // cross-cut
+    { from: 'base-model',      to: 'boss-model',      crossCut: true },
+    { from: 'level-loader',    to: 'wave-controller', crossCut: true },
+    { from: 'score-tracker',   to: 'score-display',   crossCut: true },
+  ]
+}
+
+// ── Radial layout ────────────────────────────────────────
+
+const RING_R = [90, 210, 310]
+const NODE_R = [26, 22, 18]
+
+function nodePos(node) {
+  const r = RING_R[node.ring]
+  const a = (node.sector - 90) * Math.PI / 180
+  return { px: 330 + r * Math.cos(a), py: 330 + r * Math.sin(a) }
+}
+
+// Attach positions to node definitions
+for (const n of GRAPH.nodes) {
+  const pos = nodePos(n)
+  n.px = pos.px
+  n.py = pos.py
+  n.r  = NODE_R[n.ring]
+}
 
 // ── Thermal model ────────────────────────────────────────
 
-const HEAT = { 'salt-type-change': 2.5, 'fluid-recompile': 1.0 }
-const DECAY = 0.6, COOLING = 0.4
+const HEAT     = { 'salt-type-change': 2.5, 'fluid-recompile': 1.0 }
+const LAMBDA   = 0.08   // cooling rate (loss to environment per step)
+const DT       = 0.4    // Euler time-step — smaller = more stable
+const SUBSTEPS = 4      // integrate DT in substeps for stability
+
+// Asymmetric conductance: heat flows more easily downstream than up.
+// κ_forward (dependency→dependent) = 0.8, κ_back = 0.25, κ_crosscut = 0.55 both ways
+function conductance(edge, forward) {
+  if (edge.crossCut) return 0.55
+  return forward ? 0.8 : 0.25
+}
 
 function dependentCount(id) {
-  return EDGES_DEF.filter(e => e.from === id).length
+  return GRAPH.edges.filter(e => e.from === id).length
 }
 function defaultThresholds(n) {
   const base = 1 + n * 0.5
@@ -482,7 +488,7 @@ let nodes, commitStep
 
 function initNodes() {
   nodes = {}
-  for (const n of NODES_DEF) {
+  for (const n of GRAPH.nodes) {
     const { meltingPoint, boilingPoint } = defaultThresholds(dependentCount(n.id))
     nodes[n.id] = { ...n, temperature: 0, meltingPoint, boilingPoint }
   }
@@ -496,24 +502,89 @@ function effectivePhase(node) {
   return 'salt'
 }
 
-function propagate() {
-  const delta = {}
-  for (const id of Object.keys(nodes)) delta[id] = 0
-  for (const edge of EDGES_DEF) {
-    const src = nodes[edge.from]
-    if (src.temperature <= 0) continue
-    const conductance = edge.crossCut ? 0.6 : 0.8
-    delta[edge.to] += src.temperature * conductance * DECAY
+// Discrete Fourier heat equation on a graph — one Euler step of size dt.
+// dT_i/dt = Σ_j κ_ij (T_j - T_i) - λ·T_i
+// Energy is conserved in the exchange term; λ drains to environment.
+function fourierStep(dt) {
+  const ids = Object.keys(nodes)
+  const dT = {}
+  for (const id of ids) dT[id] = 0
+
+  for (const edge of GRAPH.edges) {
+    const Ti = nodes[edge.from].temperature
+    const Tj = nodes[edge.to].temperature
+    const kFwd = conductance(edge, true)
+    const kBwd = conductance(edge, false)
+    // Forward: from→to
+    dT[edge.to]   += kFwd * (Ti - Tj) * dt
+    dT[edge.from] -= kFwd * (Ti - Tj) * dt
+    // Backward: to→from (asymmetric — less heat flows back up)
+    dT[edge.from] += kBwd * (Tj - Ti) * dt
+    dT[edge.to]   -= kBwd * (Tj - Ti) * dt
   }
-  for (const [id, d] of Object.entries(delta)) {
-    nodes[id].temperature += d
+
+  // Apply gradient changes + cooling loss
+  for (const id of ids) {
+    const node = nodes[id]
+    const cooling = LAMBDA * node.temperature * dt
+    node.temperature = Math.max(0, node.temperature + dT[id] - cooling)
   }
 }
 
-function cool() {
-  for (const node of Object.values(nodes)) {
-    node.temperature = Math.max(0, node.temperature - COOLING)
+function propagate() {
+  const dt = DT / SUBSTEPS
+  for (let i = 0; i < SUBSTEPS; i++) fourierStep(dt)
+}
+
+// ── Shape morphing ───────────────────────────────────────
+// Shapes: 0=square(salt), 1=teardrop(fluid), 2=cloud(volatile)
+// shapeBlend returns a continuous 0–2 value from temperature
+
+function shapeBlend(node) {
+  const T = node.temperature
+  if (T <= 0) return 0
+  const mp = node.meltingPoint, bp = node.boilingPoint
+  if (T < mp) return T / mp
+  if (T < bp) return 1 + (T - mp) / (bp - mp)
+  return 2
+}
+
+function squareR(theta, R) {
+  // Lp-norm with p=6 gives a smooth rounded square
+  const p = 6
+  const c = Math.abs(Math.cos(theta)), s = Math.abs(Math.sin(theta))
+  return R / Math.pow(c**p + s**p, 1/p)
+}
+
+function teardropR(theta, R) {
+  // Subtle drip pointing downward (θ=π/2)
+  return R * (1 - 0.28 * Math.sin(theta))
+}
+
+function cloudR(theta, R) {
+  // Three main lobes + high-freq texture
+  return R * (1 + 0.20 * Math.cos(3 * theta) + 0.07 * Math.cos(6 * theta + 1.0))
+}
+
+function blendedR(theta, R, t) {
+  if (t <= 1) {
+    return squareR(theta, R) * (1 - t) + teardropR(theta, R) * t
+  } else {
+    return teardropR(theta, R) * (2 - t) + cloudR(theta, R) * (t - 1)
   }
+}
+
+function shapePath(cx, cy, R, t) {
+  const N = 72
+  ctx.beginPath()
+  for (let i = 0; i <= N; i++) {
+    const theta = (i / N) * Math.PI * 2
+    const r = blendedR(theta, R, t)
+    const x = cx + r * Math.cos(theta)
+    const y = cy + r * Math.sin(theta)
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)
+  }
+  ctx.closePath()
 }
 
 // ── Canvas rendering ─────────────────────────────────────
@@ -521,7 +592,6 @@ function cool() {
 const canvas = document.getElementById('simCanvas')
 const ctx = canvas.getContext('2d')
 
-// Scale canvas for device pixel ratio
 const dpr = window.devicePixelRatio || 1
 canvas.width  = CW * dpr
 canvas.height = CH * dpr
@@ -543,90 +613,94 @@ function tempColor(node) {
   return `rgb(${Math.round(base.r+(hot.r-base.r)*t)},${Math.round(base.g+(hot.g-base.g)*t)},${Math.round(base.b+(hot.b-base.b)*t)})`
 }
 
-function drawArrow(sx, sy, dx, dy, color) {
-  const angle = Math.atan2(dy - sy, dx - sx)
-  const ar = R + 4
-  const ax = dx - ar * Math.cos(angle), ay = dy - ar * Math.sin(angle)
-  ctx.beginPath()
-  ctx.moveTo(ax, ay)
-  ctx.lineTo(ax - 7 * Math.cos(angle - 0.4), ay - 7 * Math.sin(angle - 0.4))
-  ctx.lineTo(ax - 7 * Math.cos(angle + 0.4), ay - 7 * Math.sin(angle + 0.4))
-  ctx.closePath()
-  ctx.fillStyle = color
-  ctx.fill()
-}
-
 function draw() {
   ctx.clearRect(0, 0, CW, CH)
 
-  // Subsystem zone labels
-  const zones = [
-    { label: 'entity / player', y: 20 },
-    { label: 'render', y: 330 },
-    { label: 'enemy mvc', y: 478 },
-    { label: 'level', y: 738 },
-  ]
-  ctx.font = '10px -apple-system, system-ui, sans-serif'
-  ctx.textAlign = 'right'
-  ctx.textBaseline = 'top'
-  for (const z of zones) {
-    ctx.fillStyle = 'rgba(176,125,42,0.35)'
-    ctx.fillText(z.label.toUpperCase(), CW - 12, z.y)
+  // Background ring circles
+  const ringLabels = ['salt', 'fluid', 'volatile']
+  for (let i = 0; i < 3; i++) {
+    const r = RING_R[i]
+    ctx.beginPath()
+    ctx.arc(330, 330, r, 0, Math.PI * 2)
+    ctx.strokeStyle = 'rgba(184,125,42,0.07)'
+    ctx.lineWidth = 1
+    ctx.setLineDash([])
+    ctx.stroke()
+
+    // Ring label at top of arc
+    const labelAngle = -Math.PI / 2  // top
+    const lx = 330 + r * Math.cos(labelAngle)
+    const ly = 330 + r * Math.sin(labelAngle) - 6
+    ctx.font = '9px -apple-system, system-ui, sans-serif'
+    ctx.fillStyle = 'rgba(184,125,42,0.55)'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'bottom'
+    ctx.fillText(ringLabels[i].toUpperCase(), lx, ly)
   }
 
   // Edges
-  for (const edge of EDGES_DEF) {
+  for (const edge of GRAPH.edges) {
     const src = nodes[edge.from], dst = nodes[edge.to]
     const sx = src.px, sy = src.py, dx = dst.px, dy = dst.py
-    // Shorten edge to node boundary
-    const angle = Math.atan2(dy - sy, dx - sx)
-    const ex = sx + R * Math.cos(angle), ey = sy + R * Math.sin(angle)
-    const ex2 = dx - R * Math.cos(angle), ey2 = dy - R * Math.sin(angle)
+    const srcR = src.r, dstR = dst.r
 
-    ctx.beginPath()
-    ctx.moveTo(ex, ey)
-    ctx.lineTo(ex2, ey2)
     if (edge.crossCut) {
+      // Quadratic bezier curving toward center (330,330)
+      const mx = (sx + dx) / 2, my = (sy + dy) / 2
+      // Pull control point toward center
+      const cpx = mx + (330 - mx) * 0.5
+      const cpy = my + (330 - my) * 0.5
+
+      ctx.beginPath()
+      ctx.moveTo(sx, sy)
+      ctx.quadraticCurveTo(cpx, cpy, dx, dy)
       ctx.setLineDash([5, 4])
-      ctx.strokeStyle = 'rgba(184,125,42,0.55)'
+      ctx.strokeStyle = 'rgba(184,125,42,0.6)'
       ctx.lineWidth = 1.5
+      ctx.stroke()
+      ctx.setLineDash([])
     } else {
+      const angle = Math.atan2(dy - sy, dx - sx)
+      const ex  = sx + srcR * Math.cos(angle), ey  = sy + srcR * Math.sin(angle)
+      const ex2 = dx - dstR * Math.cos(angle), ey2 = dy - dstR * Math.sin(angle)
+      ctx.beginPath()
+      ctx.moveTo(ex, ey)
+      ctx.lineTo(ex2, ey2)
       ctx.setLineDash([])
       ctx.strokeStyle = '#EDE5D8'
       ctx.lineWidth = 1.5
+      ctx.stroke()
     }
-    ctx.stroke()
-    ctx.setLineDash([])
-    drawArrow(sx, sy, dx, dy, edge.crossCut ? 'rgba(184,125,42,0.55)' : '#EDE5D8')
   }
 
   // Nodes
-  for (const n of NODES_DEF) {
+  for (const n of GRAPH.nodes) {
     const node = nodes[n.id]
     const cx = n.px, cy = n.py
+    const R  = n.r
     const col = tempColor(node)
+    const glowR = n.ring === 0 ? R * 2.2 : R * 1.9
+    const t = shapeBlend(node)
 
-    // Glow
+    // Glow (always circle — it's ambient)
     if (node.temperature > 0.05) {
       const intensity = Math.min(1, node.temperature / node.boilingPoint)
-      const grd = ctx.createRadialGradient(cx, cy, R * 0.5, cx, cy, R * 2.2)
+      const grd = ctx.createRadialGradient(cx, cy, R * 0.5, cx, cy, glowR)
       grd.addColorStop(0, `rgba(217,79,42,${intensity * 0.28})`)
       grd.addColorStop(1, 'rgba(217,79,42,0)')
       ctx.beginPath()
-      ctx.arc(cx, cy, R * 2.2, 0, Math.PI * 2)
+      ctx.arc(cx, cy, glowR, 0, Math.PI * 2)
       ctx.fillStyle = grd
       ctx.fill()
     }
 
-    // Fill
-    ctx.beginPath()
-    ctx.arc(cx, cy, R, 0, Math.PI * 2)
+    // Fill — morphed shape
+    shapePath(cx, cy, R, t)
     ctx.fillStyle = col
     ctx.fill()
 
-    // Border = intrinsic phase
-    ctx.beginPath()
-    ctx.arc(cx, cy, R, 0, Math.PI * 2)
+    // Border — same morphed shape, style = intrinsic phase
+    shapePath(cx, cy, R, t)
     if (n.phase === 'salt') {
       ctx.setLineDash([])
       ctx.lineWidth = 2.5
@@ -641,24 +715,27 @@ function draw() {
     ctx.stroke()
     ctx.setLineDash([])
 
-    // Label
-    ctx.textAlign = 'center'
+    // Label — 2-line via \n split
+    const lines = n.label.split('\n')
+    const fontSize = n.ring === 0 ? 9 : n.ring === 1 ? 8 : 7
+    ctx.font = `bold ${fontSize}px -apple-system, system-ui, sans-serif`
     ctx.fillStyle = 'rgba(255,255,255,0.92)'
-    if (n.label.length === 1) {
-      ctx.font = 'bold 9px -apple-system, system-ui, sans-serif'
+    ctx.textAlign = 'center'
+
+    if (lines.length === 1) {
       ctx.textBaseline = 'middle'
-      ctx.fillText(n.label[0], cx, cy - 4)
+      ctx.fillText(lines[0], cx, cy - 4)
     } else {
-      ctx.font = 'bold 8px -apple-system, system-ui, sans-serif'
       ctx.textBaseline = 'middle'
-      ctx.fillText(n.label[0], cx, cy - 7)
-      ctx.fillText(n.label[1], cx, cy + 2)
+      ctx.fillText(lines[0], cx, cy - 7)
+      ctx.fillText(lines[1], cx, cy + 2)
     }
 
     // Temperature
     ctx.font = '7px ui-monospace, monospace'
     ctx.fillStyle = 'rgba(255,255,255,0.6)'
-    ctx.fillText(`${node.temperature.toFixed(1)}°`, cx, cy + 13)
+    ctx.textBaseline = 'middle'
+    ctx.fillText(`${node.temperature.toFixed(1)}°`, cx, cy + R + 8)
   }
 
   // Commit counter
@@ -683,7 +760,7 @@ function addLog(msg, cls = '') {
 // ── Controls ─────────────────────────────────────────────
 
 const prevEffective = {}
-for (const n of NODES_DEF) prevEffective[n.id] = 'salt'
+for (const n of GRAPH.nodes) prevEffective[n.id] = 'salt'
 
 function fireEvent(nodeId, kind) {
   const heat = HEAT[kind]
@@ -696,14 +773,13 @@ function fireEvent(nodeId, kind) {
 function stepCommit() {
   commitStep++
   propagate()
-  cool()
   checkTransitions()
-  addLog(`commit ${commitStep} — propagated + cooled`, 'step')
+  addLog(`commit ${commitStep}`, 'step')
   draw()
 }
 
 function checkTransitions() {
-  for (const n of NODES_DEF) {
+  for (const n of GRAPH.nodes) {
     const ep = effectivePhase(nodes[n.id])
     if (ep !== prevEffective[n.id]) {
       addLog(`⚡ ${n.id}: ${prevEffective[n.id]} → ${ep}`, 'transition')
@@ -713,10 +789,34 @@ function checkTransitions() {
 }
 
 function resetSim() {
+  stopPlay()
   initNodes()
-  for (const n of NODES_DEF) prevEffective[n.id] = 'salt'
+  for (const n of GRAPH.nodes) prevEffective[n.id] = 'salt'
   log.innerHTML = '<div class="log-entry step">Reset. Ready.</div>'
   draw()
+}
+
+// ── Play / Pause ──────────────────────────────────────────
+
+let playInterval = null
+
+function togglePlay() {
+  if (playInterval) {
+    stopPlay()
+  } else {
+    playInterval = setInterval(() => {
+      stepCommit()
+    }, 1000)
+    document.getElementById('playBtn').textContent = '⏸ Pause'
+  }
+}
+
+function stopPlay() {
+  if (playInterval) {
+    clearInterval(playInterval)
+    playInterval = null
+  }
+  document.getElementById('playBtn').textContent = '▶ Play'
 }
 
 // ── Click / tap ──────────────────────────────────────────
@@ -731,9 +831,10 @@ function canvasCoords(e) {
 }
 
 function hitNode(x, y) {
-  for (const n of NODES_DEF) {
+  for (const n of GRAPH.nodes) {
     const dx = x - n.px, dy = y - n.py
-    if (dx * dx + dy * dy <= (R + 6) * (R + 6)) return n
+    const hitR = n.r + 6
+    if (dx * dx + dy * dy <= hitR * hitR) return n
   }
   return null
 }
@@ -743,8 +844,9 @@ function handleTap(e) {
   const { x, y } = canvasCoords(e)
   const n = hitNode(x, y)
   if (!n) return
-  const kind = n.phase === 'salt' ? 'salt-type-change' : 'fluid-recompile'
+  const kind = n.ring === 0 ? 'salt-type-change' : 'fluid-recompile'
   fireEvent(n.id, kind)
+  if (!playInterval) togglePlay()
 }
 
 canvas.addEventListener('click', handleTap)
