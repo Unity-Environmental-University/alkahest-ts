@@ -541,7 +541,7 @@ function dependentCount(id) {
   return GRAPH.edges.filter(e => e.from === id).length
 }
 function defaultThresholds(n) {
-  const base = 1 + n * 0.5
+  const base = 5 + n * 2
   return { meltingPoint: base, boilingPoint: base * 2 }
 }
 
