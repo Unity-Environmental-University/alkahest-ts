@@ -443,24 +443,65 @@ const GRAPH = {
   ]
 }
 
-// ── Radial layout ────────────────────────────────────────
+// ── Radial force-directed layout ─────────────────────────
 
 const RING_R = [90, 210, 310]
 const NODE_R = [26, 22, 18]
+const CX = 330, CY = 330
 
-function nodePos(node) {
-  const r = RING_R[node.ring]
-  const a = (node.sector - 90) * Math.PI / 180
-  return { px: 330 + r * Math.cos(a), py: 330 + r * Math.sin(a) }
+function computeLayout() {
+  // Seed: evenly spaced angles per ring
+  const byRing = [[], [], []]
+  for (const n of GRAPH.nodes) byRing[n.ring].push(n)
+  for (const ring of byRing) {
+    ring.forEach((n, i) => { n._angle = (i / ring.length) * 2 * Math.PI })
+  }
+
+  // Angular force-directed: edges attract, all nodes repel
+  for (let iter = 0; iter < 300; iter++) {
+    const force = new Map(GRAPH.nodes.map(n => [n.id, 0]))
+
+    // Repulsion between all node pairs
+    for (let i = 0; i < GRAPH.nodes.length; i++) {
+      for (let j = i + 1; j < GRAPH.nodes.length; j++) {
+        const a = GRAPH.nodes[i], b = GRAPH.nodes[j]
+        let dA = a._angle - b._angle
+        while (dA >  Math.PI) dA -= 2 * Math.PI
+        while (dA < -Math.PI) dA += 2 * Math.PI
+        const f = 0.015 / (dA * dA + 0.04)
+        force.set(a.id, force.get(a.id) + f * Math.sign(dA))
+        force.set(b.id, force.get(b.id) - f * Math.sign(dA))
+      }
+    }
+
+    // Edge attraction (angular spring toward neighbor)
+    for (const edge of GRAPH.edges) {
+      const a = GRAPH.nodes.find(n => n.id === edge.from)
+      const b = GRAPH.nodes.find(n => n.id === edge.to)
+      let dA = b._angle - a._angle
+      while (dA >  Math.PI) dA -= 2 * Math.PI
+      while (dA < -Math.PI) dA += 2 * Math.PI
+      const k = edge.crossCut ? 0.004 : 0.008
+      force.set(a.id, force.get(a.id) + k * dA)
+      force.set(b.id, force.get(b.id) - k * dA)
+    }
+
+    const damp = 1 - iter / 300
+    for (const n of GRAPH.nodes) {
+      n._angle += force.get(n.id) * 0.12 * damp
+    }
+  }
+
+  // Apply final positions
+  for (const n of GRAPH.nodes) {
+    const r = RING_R[n.ring]
+    n.px = CX + r * Math.cos(n._angle - Math.PI / 2)
+    n.py = CY + r * Math.sin(n._angle - Math.PI / 2)
+    n.r  = NODE_R[n.ring]
+  }
 }
 
-// Attach positions to node definitions
-for (const n of GRAPH.nodes) {
-  const pos = nodePos(n)
-  n.px = pos.px
-  n.py = pos.py
-  n.r  = NODE_R[n.ring]
-}
+computeLayout()
 
 // ── Thermal model ────────────────────────────────────────
 
@@ -490,7 +531,7 @@ function initNodes() {
   nodes = {}
   for (const n of GRAPH.nodes) {
     const { meltingPoint, boilingPoint } = defaultThresholds(dependentCount(n.id))
-    nodes[n.id] = { ...n, temperature: 0, meltingPoint, boilingPoint }
+    nodes[n.id] = { ...n, temperature: 0, meltingPoint, boilingPoint, flash: 0 }
   }
   commitStep = 0
 }
@@ -644,33 +685,23 @@ function draw() {
     const sx = src.px, sy = src.py, dx = dst.px, dy = dst.py
     const srcR = src.r, dstR = dst.r
 
+    const angle = Math.atan2(dy - sy, dx - sx)
+    const ex  = sx + srcR * Math.cos(angle), ey  = sy + srcR * Math.sin(angle)
+    const ex2 = dx - dstR * Math.cos(angle), ey2 = dy - dstR * Math.sin(angle)
+    ctx.beginPath()
+    ctx.moveTo(ex, ey)
+    ctx.lineTo(ex2, ey2)
     if (edge.crossCut) {
-      // Quadratic bezier curving toward center (330,330)
-      const mx = (sx + dx) / 2, my = (sy + dy) / 2
-      // Pull control point toward center
-      const cpx = mx + (330 - mx) * 0.5
-      const cpy = my + (330 - my) * 0.5
-
-      ctx.beginPath()
-      ctx.moveTo(sx, sy)
-      ctx.quadraticCurveTo(cpx, cpy, dx, dy)
       ctx.setLineDash([5, 4])
-      ctx.strokeStyle = 'rgba(184,125,42,0.6)'
+      ctx.strokeStyle = 'rgba(184,125,42,0.55)'
       ctx.lineWidth = 1.5
-      ctx.stroke()
-      ctx.setLineDash([])
     } else {
-      const angle = Math.atan2(dy - sy, dx - sx)
-      const ex  = sx + srcR * Math.cos(angle), ey  = sy + srcR * Math.sin(angle)
-      const ex2 = dx - dstR * Math.cos(angle), ey2 = dy - dstR * Math.sin(angle)
-      ctx.beginPath()
-      ctx.moveTo(ex, ey)
-      ctx.lineTo(ex2, ey2)
       ctx.setLineDash([])
       ctx.strokeStyle = '#EDE5D8'
       ctx.lineWidth = 1.5
-      ctx.stroke()
     }
+    ctx.stroke()
+    ctx.setLineDash([])
   }
 
   // Nodes
@@ -681,6 +712,18 @@ function draw() {
     const col = tempColor(node)
     const glowR = n.ring === 0 ? R * 2.2 : R * 1.9
     const t = shapeBlend(node)
+
+    // Flash ring on phase transition
+    if (node.flash > 0) {
+      const fr = R + (1 - node.flash) * R * 2.5
+      ctx.beginPath()
+      ctx.arc(cx, cy, fr, 0, Math.PI * 2)
+      ctx.strokeStyle = `rgba(255,255,255,${node.flash * 0.8})`
+      ctx.lineWidth = 2.5 * node.flash
+      ctx.setLineDash([])
+      ctx.stroke()
+      node.flash = Math.max(0, node.flash - 0.06)
+    }
 
     // Glow (always circle — it's ambient)
     if (node.temperature > 0.05) {
@@ -780,10 +823,12 @@ function stepCommit() {
 
 function checkTransitions() {
   for (const n of GRAPH.nodes) {
-    const ep = effectivePhase(nodes[n.id])
+    const node = nodes[n.id]
+    const ep = effectivePhase(node)
     if (ep !== prevEffective[n.id]) {
       addLog(`⚡ ${n.id}: ${prevEffective[n.id]} → ${ep}`, 'transition')
       prevEffective[n.id] = ep
+      node.flash = 1.0
     }
   }
 }
@@ -852,7 +897,12 @@ function handleTap(e) {
 canvas.addEventListener('click', handleTap)
 canvas.addEventListener('touchstart', handleTap, { passive: false })
 
-draw()
+// rAF loop — runs continuously so flash rings animate between commit steps
+function loop() {
+  draw()
+  requestAnimationFrame(loop)
+}
+loop()
 
 // ── Modals ───────────────────────────────────────────────
 
