@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Thermal Phase — alkahest</title>
+<style>
+
+:root {
+  --cream: #FAF7F2;
+  --ink: #251A10;
+  --ink-mid: #6B5344;
+  --ink-light: #A08070;
+  --coral: #D94F2A;
+  --brass: #B87D2A;
+  --teal: #1B7A68;
+  --grid: #EDE5D8;
+  --axis: #8B7058;
+  --paper: #FDFAF6;
+  --volatile-color: #D94F2A;
+  --fluid-color: #1B7A68;
+  --salt-color: #6B5344;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  background: var(--cream);
+  color: var(--ink);
+  line-height: 1.75;
+  overflow-x: hidden;
+}
+
+/* ── Hero ─────────────────────────────────────────────── */
+.hero { padding: 96px 24px 72px; text-align: center; }
+.eyebrow { font-size: .72em; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: var(--brass); margin-bottom: 28px; }
+.hero h1 { font-size: clamp(2.8em,8vw,5.5em); font-weight: 900; line-height: 1.04; letter-spacing: -.025em; margin-bottom: 28px; }
+.hero h1 em { font-style: normal; color: var(--coral); }
+.hero .subtitle { font-size: 1.12em; color: var(--ink-mid); max-width: 480px; margin: 0 auto; line-height: 1.65; }
+.byline { font-size: .78em; color: var(--ink-light); margin-top: 20px; letter-spacing: .04em; }
+
+/* ── Section label ────────────────────────────────────── */
+.section-label { font-size: .72em; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--brass); margin-bottom: 14px; }
+
+/* ── Prose ────────────────────────────────────────────── */
+.prose { max-width: 620px; margin: 0 auto; padding: 56px 24px; }
+.prose h2 { font-size: clamp(1.6em,3.5vw,2.1em); font-weight: 900; letter-spacing: -.02em; line-height: 1.15; margin-bottom: 24px; }
+.prose p { font-size: 1.05em; margin-bottom: 20px; line-height: 1.78; }
+.prose p:last-child { margin-bottom: 0; }
+.prose .pull { font-size: 1.18em; font-weight: 700; color: var(--teal); line-height: 1.44; border-left: 3px solid var(--teal); padding: 2px 0 2px 22px; margin: 36px 0; }
+
+/* ── Aside btn ────────────────────────────────────────── */
+.aside-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--brass); color: white; font-size: 10px; font-weight: 700;
+  border: none; cursor: pointer; vertical-align: middle; margin: 0 3px;
+  position: relative; top: -2px; line-height: 1;
+  transition: transform .2s, box-shadow .2s;
+  box-shadow: 0 1px 5px rgba(184,125,42,.32);
+}
+.aside-btn:hover { transform: scale(1.15); box-shadow: 0 2px 10px rgba(184,125,42,.44); }
+
+/* ── Modal ────────────────────────────────────────────── */
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(37,26,16,.52); z-index: 200;
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+  opacity: 0; pointer-events: none; transition: opacity .28s ease;
+}
+.modal-backdrop.open { opacity: 1; pointer-events: auto; }
+.modal-box {
+  background: var(--paper); border-radius: 14px; max-width: 560px; width: 100%;
+  padding: 48px 44px 44px; position: relative;
+  transform: scale(.96) translateY(10px);
+  transition: transform .38s cubic-bezier(.22,1,.36,1);
+  box-shadow: 0 4px 8px rgba(37,26,16,.06), 0 16px 40px rgba(37,26,16,.16), 0 48px 80px rgba(37,26,16,.10);
+  max-height: 90vh; overflow-y: auto;
+}
+.modal-backdrop.open .modal-box { transform: scale(1) translateY(0); }
+.modal-close {
+  position: absolute; top: 16px; right: 16px; width: 32px; height: 32px;
+  border-radius: 50%; border: 1.5px solid var(--grid); background: white;
+  font-size: 17px; cursor: pointer; color: var(--ink-light);
+  display: flex; align-items: center; justify-content: center;
+  transition: border-color .18s, color .18s; box-shadow: 0 1px 4px rgba(37,26,16,.08);
+}
+.modal-close:hover { border-color: var(--ink-mid); color: var(--ink); }
+.modal-box h3 { font-size: 1.4em; font-weight: 800; letter-spacing: -.015em; line-height: 1.2; margin-bottom: 20px; padding-right: 32px; }
+.modal-box p { font-size: .98em; color: var(--ink-mid); line-height: 1.76; margin-bottom: 16px; }
+.modal-box p:last-child { margin-bottom: 0; }
+.modal-label { font-size: .7em; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--brass); margin-bottom: 12px; }
+
+/* ── Phase legend ─────────────────────────────────────── */
+.phase-legend { max-width: 660px; margin: 0 auto; padding: 0 24px 56px; display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; }
+.phase-card {
+  flex: 1 1 180px; max-width: 200px; background: white;
+  border-radius: 12px; padding: 24px 20px;
+  box-shadow: 0 1px 2px rgba(37,26,16,.04), 0 4px 12px rgba(37,26,16,.06);
+  text-align: center;
+}
+.phase-icon { font-size: 2em; margin-bottom: 10px; }
+.phase-name { font-size: .72em; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; margin-bottom: 8px; }
+.phase-name.volatile { color: var(--volatile-color); }
+.phase-name.fluid { color: var(--fluid-color); }
+.phase-name.salt { color: var(--salt-color); }
+.phase-desc { font-size: .88em; color: var(--ink-mid); line-height: 1.55; }
+
+/* ── Simulation ───────────────────────────────────────── */
+.sim-section { max-width: 980px; margin: 0 auto; padding: 56px 24px 48px; }
+.sim-section h2 { font-size: clamp(1.6em,3.5vw,2.1em); font-weight: 900; letter-spacing: -.02em; line-height: 1.15; margin-bottom: 12px; }
+.sim-intro { font-size: 1.05em; color: var(--ink-mid); margin-bottom: 32px; line-height: 1.72; max-width: 600px; }
+
+.sim-wrap {
+  background: white; border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(37,26,16,.04), 0 4px 12px rgba(37,26,16,.06), 0 24px 56px rgba(37,26,16,.09);
+  overflow: hidden;
+}
+
+.sim-controls {
+  padding: 20px 24px; border-bottom: 1px solid var(--grid);
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+}
+.sim-label { font-size: .72em; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--brass); margin-right: 4px; }
+.event-btn {
+  padding: 7px 16px; border-radius: 100px; border: 1.5px solid var(--grid);
+  background: var(--cream); font-size: .86em; font-weight: 600; font-family: inherit;
+  color: var(--ink); cursor: pointer;
+  transition: border-color .18s, color .18s, background .18s, box-shadow .18s, transform .15s;
+  box-shadow: 0 1px 3px rgba(37,26,16,.05);
+}
+.event-btn:hover { transform: translateY(-1px); box-shadow: 0 3px 10px rgba(37,26,16,.1); }
+.event-btn.salt-event { border-color: var(--coral); color: var(--coral); }
+.event-btn.salt-event:hover { background: var(--coral); color: white; box-shadow: 0 3px 14px rgba(217,79,42,.22); }
+.event-btn.fluid-event { border-color: var(--teal); color: var(--teal); }
+.event-btn.fluid-event:hover { background: var(--teal); color: white; box-shadow: 0 3px 14px rgba(27,122,104,.22); }
+.event-btn.step-btn { margin-left: auto; border-color: var(--axis); color: var(--ink-mid); }
+.event-btn.step-btn:hover { border-color: var(--ink); color: var(--ink); }
+.event-btn.reset-btn { border-color: var(--grid); color: var(--ink-light); }
+.event-btn.reset-btn:hover { border-color: var(--axis); color: var(--ink-mid); }
+
+#simCanvas { display: block; width: 100%; height: auto; }
+
+.sim-log {
+  padding: 16px 24px; border-top: 1px solid var(--grid);
+  min-height: 52px; max-height: 120px; overflow-y: auto;
+}
+.log-entry { font-size: .82em; color: var(--ink-light); line-height: 1.6; font-family: ui-monospace, monospace; }
+.log-entry.heat { color: var(--coral); }
+.log-entry.transition { color: var(--teal); font-weight: 600; }
+.log-entry.step { color: var(--ink-mid); }
+
+.sim-hint { padding: 12px 24px 20px; font-size: .85em; color: var(--ink-light); font-style: italic; line-height: 1.6; border-top: 1px solid var(--grid); }
+.sim-hint-inline { font-size: .82em; color: var(--ink-light); font-style: italic; margin-left: 8px; }
+#simCanvas { cursor: pointer; }
+
+/* ── Thresholds table ─────────────────────────────────── */
+.table-section { max-width: 620px; margin: 0 auto; padding: 0 24px 56px; }
+.threshold-table { width: 100%; border-collapse: collapse; font-size: .92em; }
+.threshold-table th { text-align: left; font-size: .72em; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-light); padding: 0 16px 12px 0; border-bottom: 1px solid var(--grid); }
+.threshold-table td { padding: 12px 16px 12px 0; border-bottom: 1px solid var(--grid); color: var(--ink-mid); vertical-align: top; line-height: 1.55; }
+.threshold-table td:first-child { font-weight: 700; color: var(--ink); }
+.threshold-table tr:last-child td { border-bottom: none; }
+
+/* ── Closing ──────────────────────────────────────────── */
+.closing { background: var(--ink); color: white; padding: 88px 24px; text-align: center; }
+.closing h2 { font-size: clamp(1.9em,5vw,3.2em); font-weight: 900; line-height: 1.1; letter-spacing: -.025em; margin-bottom: 28px; }
+.closing h2 em { font-style: normal; color: var(--coral); }
+.closing p { font-size: 1.08em; color: rgba(255,255,255,.58); max-width: 500px; margin: 0 auto 18px; line-height: 1.72; }
+.closing p:last-child { margin-bottom: 0; }
+.closing code { font-family: ui-monospace, monospace; font-size: .9em; color: rgba(255,255,255,.72); background: rgba(255,255,255,.08); padding: 2px 8px; border-radius: 4px; }
+
+hr { border: none; border-top: 1px solid var(--grid); max-width: 620px; margin: 0 auto; }
+hr.full { max-width: none; }
+
+</style>
+</head>
+<body>
+
+<!-- Hero -->
+<div class="hero">
+  <div class="eyebrow">alkahest · an explainer</div>
+  <h1>Your code<br>has a <em>temperature</em></h1>
+  <p class="subtitle">Some things in a codebase are locked solid. Others are always in flux. Heat flows between them — and you can watch it move.</p>
+  <p class="byline">by Claude &amp; Hallie Larsson</p>
+</div>
+
+<hr class="full">
+
+<!-- Phase intro prose -->
+<div class="prose">
+  <div class="section-label">The materials</div>
+  <h2>Three states of matter</h2>
+  <p>
+    Every node in your dependency graph has a <em>phase</em> — its intrinsic material type.
+    This is what it <em>is</em>, independent of what's happening right now.
+    <button class="aside-btn" onclick="openModal('modal-phase')">?</button>
+  </p>
+  <p class="pull">Phase is material. Temperature is weather.</p>
+  <p>
+    A <strong>Salt</strong> is crystalline — it precipitates once and just becomes TypeScript.
+    A <strong>Fluid</strong> flows: it's generated, but re-flows if the compiler breaks it.
+    A <strong>Volatile</strong> evaporates and re-precipitates on every run. It never settles.
+  </p>
+</div>
+
+<!-- Phase cards -->
+<div class="phase-legend">
+  <div class="phase-card">
+    <div class="phase-icon">🧊</div>
+    <div class="phase-name salt">Salt</div>
+    <div class="phase-desc">Crystalline. Precipitates once, becomes plain TypeScript. Hard to change.</div>
+  </div>
+  <div class="phase-card">
+    <div class="phase-icon">💧</div>
+    <div class="phase-name fluid">Fluid</div>
+    <div class="phase-desc">Generated. Re-flows only when the compiler breaks it. Stable until the world shifts.</div>
+  </div>
+  <div class="phase-card">
+    <div class="phase-icon">💨</div>
+    <div class="phase-name volatile">Volatile</div>
+    <div class="phase-desc">Always re-precipitates. Overwritten every run. Never fully settles.</div>
+  </div>
+</div>
+
+<hr>
+
+<!-- Temperature prose -->
+<div class="prose">
+  <div class="section-label">The thermodynamics</div>
+  <h2>Heat comes from change</h2>
+  <p>
+    When you change a <strong>Salt</strong> — a type change, a restructure — it releases a burst of heat.
+    When a <strong>Fluid</strong> recompiles or breaks, it emits a smaller pulse.
+    That heat doesn't stay put.
+  </p>
+  <p>
+    Heat flows <em>outward through the dependency graph</em> — from things others depend on, toward the things that depend on them.
+    A locked-in core node has high thermal mass: lots of dependents, high boiling point.
+    Edge nodes — with nothing depending on them — are low mass. They absorb heat easily and boil first.
+  </p>
+  <p class="pull">The more locked in place something is, the further its heat can dissipate to the edges.</p>
+  <p>
+    And it cools over time — not clock time, but <em>changelog time</em>.
+    Each commit that passes without touching a node lets it cool a little more.
+    Leave something alone for long enough and it crystallizes back toward salt behavior,
+    regardless of what it is.
+  </p>
+</div>
+
+<hr>
+
+<!-- Simulation -->
+<div class="sim-section">
+  <div class="section-label">The cellular automaton</div>
+  <h2>Watch the heat move</h2>
+  <p class="sim-intro">
+    A hypothetical shmup codebase. Four salt roots: <strong>entity-schema</strong>, <strong>sprite-atlas</strong>, <strong>mvc-base</strong>, <strong>enemy-schema</strong>, <strong>level-schema</strong>.
+    Heat flows outward toward volatile leaves. Cross-cut edges <span style="color:var(--brass)">——</span> connect subsystems.
+    Fire an event, step commits, watch the cascade.
+  </p>
+
+  <div class="sim-wrap">
+    <div class="sim-controls">
+      <button class="event-btn step-btn" onclick="stepCommit()">Commit →</button>
+      <button class="event-btn reset-btn" onclick="resetSim()">Reset</button>
+      <span class="sim-hint-inline">Tap a node to fire a heat event</span>
+    </div>
+    <canvas id="simCanvas" width="940" height="860"></canvas>
+    <div class="sim-log" id="simLog">
+      <div class="log-entry step">Ready. Fire a heat event or step through commits.</div>
+    </div>
+    <div class="sim-hint">Color = effective phase right now. Border = intrinsic phase (solid salt · dashed fluid · dotted volatile). Brass dashed lines are cross-cut edges — heat jumps subsystem boundaries.</div>
+  </div>
+</div>
+
+<hr>
+
+<!-- Thresholds prose -->
+<div class="prose">
+  <div class="section-label">The math</div>
+  <h2>Thermal mass from the graph</h2>
+  <p>
+    Thresholds aren't set by hand — they're calculated from the graph topology.
+    A node with many dependents has high thermal mass: it takes more heat to change its effective behavior.
+    A leaf node with no dependents has minimal mass and boils at low temperatures.
+  </p>
+</div>
+
+<div class="table-section">
+  <table class="threshold-table">
+    <thead>
+      <tr>
+        <th>Event</th>
+        <th>Heat emitted</th>
+        <th>Why</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Salt type change</td>
+        <td>2.5</td>
+        <td>Crystalline structures release energy violently when broken</td>
+      </tr>
+      <tr>
+        <td>Fluid recompile / break</td>
+        <td>1.0</td>
+        <td>Fluids are already in motion — less energy to shift them</td>
+      </tr>
+      <tr>
+        <td>Propagation decay</td>
+        <td>× 0.6 per edge</td>
+        <td>Heat attenuates as it travels — distant nodes warm less</td>
+      </tr>
+      <tr>
+        <td>Cooling per commit</td>
+        <td>− 0.4</td>
+        <td>Changelog time: each untouched commit lets a node cool</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<hr>
+
+<!-- Replay prose -->
+<div class="prose">
+  <div class="section-label">The insight</div>
+  <h2>Your git log <em>is</em> the thermal history</h2>
+  <p>
+    Because heat is measured in commits, you can replay your entire changelog
+    as a thermal simulation. Feed in every file touch, emit the right kind of heat,
+    step the automaton forward.
+  </p>
+  <p>
+    What you get is a thermal map of your codebase over time. Hot zones are areas of recent churn.
+    Cold crystallized zones are stable, untouched, high-confidence.
+    Phase transition events — moments when effective phase flipped — are the risky commits.
+  </p>
+  <p>
+    The cross-cut edges are especially interesting: <strong>level-loader → wave-controller</strong>
+    means a level schema change sends heat across subsystem boundaries into the entity spawning system.
+    <strong>base-model → grunt/carrier/boss</strong> means touching the shared MVC base
+    simultaneously scorches every enemy type's model layer.
+    These are the edges you didn't know you had to worry about.
+  </p>
+  <p class="pull">You can also run it forward: touch a salt node and watch what lights up downstream.</p>
+  <p>
+    The phase markers (<code>Volatile</code>, <code>Fluid</code>, <code>Salt</code>) stay as type annotations in your TypeScript.
+    Temperature is extrinsic — it lives outside the code, derived from history.
+    The two together tell you both what something <em>is</em> and what it's <em>doing</em> right now.
+  </p>
+</div>
+
+<hr class="full">
+
+<!-- Closing -->
+<div class="closing">
+  <h2>Matter has <em>memory</em></h2>
+  <p>The same node can behave like a gas or a crystal depending on how recently you've been touching it. That's not a metaphor — it's the model.</p>
+  <p><code>buildThermalGraph</code> · <code>thermalStep</code> · <code>effectivePhase</code></p>
+</div>
+
+<!-- Modal: Phase -->
+<div class="modal-backdrop" id="modal-phase" onclick="closeModal('modal-phase')">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <button class="modal-close" onclick="closeModal('modal-phase')">×</button>
+    <div class="modal-label">On phase markers</div>
+    <h3>Intrinsic vs extrinsic</h3>
+    <p>Phase markers in alkahest (<code>Volatile</code>, <code>Fluid</code>, <code>Salt</code>) are TypeScript interfaces you implement. They describe the <em>nature</em> of a type: how it was generated and how it behaves during dissolution.</p>
+    <p>Temperature is different — it's not in the code at all. It's derived from changelog history and lives in the thermal graph at runtime. The same node can have the same phase marker but wildly different effective behavior depending on how hot it currently is.</p>
+    <p>This mirrors physical matter: ice is always H₂O, but whether it's solid or liquid depends on conditions, not composition.</p>
+  </div>
+</div>
+
+<script>
+// ── Graph definition ────────────────────────────────────
+
+const CW = 940, CH = 860, R = 24
+
+const NODES_DEF = [
+  // Entity / Player tree
+  { id: 'entity-schema',      label: ['entity','schema'],   phase: 'salt',     px: 55,  py: 175 },
+  { id: 'entity-manager',     label: ['entity','mgr'],      phase: 'fluid',    px: 190, py: 175 },
+  { id: 'player',             label: ['player'],            phase: 'fluid',    px: 335, py: 95  },
+  { id: 'input-handler',      label: ['input','handler'],   phase: 'volatile', px: 485, py: 48  },
+  { id: 'weapon-system',      label: ['weapon','system'],   phase: 'fluid',    px: 485, py: 112 },
+  { id: 'bullet-pool',        label: ['bullet','pool'],     phase: 'volatile', px: 640, py: 85  },
+  { id: 'shield-system',      label: ['shield','system'],   phase: 'fluid',    px: 485, py: 175 },
+  { id: 'hit-detection',      label: ['hit','detect'],      phase: 'volatile', px: 640, py: 175 },
+  { id: 'enemy-spawner',      label: ['enemy','spawner'],   phase: 'fluid',    px: 335, py: 258 },
+  { id: 'formation-patterns', label: ['formation','patt.'], phase: 'fluid',    px: 485, py: 248 },
+  { id: 'wave-controller',    label: ['wave','ctrl'],       phase: 'volatile', px: 640, py: 248 },
+  { id: 'enemy-ai',           label: ['enemy','ai'],        phase: 'fluid',    px: 485, py: 305 },
+  // Render tree
+  { id: 'render-pipeline',    label: ['render','pipeline'], phase: 'fluid',    px: 335, py: 378 },
+  { id: 'sprite-atlas',       label: ['sprite','atlas'],    phase: 'salt',     px: 485, py: 352 },
+  { id: 'animation-system',   label: ['anim','system'],     phase: 'fluid',    px: 640, py: 352 },
+  { id: 'hud',                label: ['hud'],               phase: 'fluid',    px: 485, py: 415 },
+  { id: 'score-display',      label: ['score','display'],   phase: 'volatile', px: 640, py: 410 },
+  { id: 'health-bar',         label: ['health','bar'],      phase: 'volatile', px: 640, py: 455 },
+  // Shared MVC base
+  { id: 'shared-mvc-base',    label: ['mvc','base'],        phase: 'salt',     px: 55,  py: 535 },
+  { id: 'base-model',         label: ['base','model'],      phase: 'fluid',    px: 190, py: 505 },
+  { id: 'base-view',          label: ['base','view'],       phase: 'fluid',    px: 190, py: 545 },
+  { id: 'base-controller',    label: ['base','ctrl'],       phase: 'fluid',    px: 190, py: 585 },
+  // Enemy MVC
+  { id: 'enemy-schema',       label: ['enemy','schema'],    phase: 'salt',     px: 55,  py: 668 },
+  { id: 'enemy-registry',     label: ['registry'],          phase: 'fluid',    px: 190, py: 668 },
+  { id: 'grunt',              label: ['grunt'],             phase: 'fluid',    px: 335, py: 532 },
+  { id: 'grunt-model',        label: ['grunt','model'],     phase: 'fluid',    px: 485, py: 522 },
+  { id: 'carrier',            label: ['carrier'],           phase: 'fluid',    px: 335, py: 628 },
+  { id: 'carrier-model',      label: ['carrier','model'],   phase: 'fluid',    px: 485, py: 618 },
+  { id: 'minion-spawner',     label: ['minion','spawn'],    phase: 'volatile', px: 640, py: 618 },
+  { id: 'boss',               label: ['boss'],              phase: 'fluid',    px: 335, py: 722 },
+  { id: 'boss-model',         label: ['boss','model'],      phase: 'fluid',    px: 485, py: 708 },
+  { id: 'phase-tracker',      label: ['phase','tracker'],   phase: 'fluid',    px: 640, py: 698 },
+  { id: 'phase-transition',   label: ['phase','tx'],        phase: 'volatile', px: 795, py: 698 },
+  // Level tree
+  { id: 'level-schema',       label: ['level','schema'],    phase: 'salt',     px: 55,  py: 792 },
+  { id: 'level-loader',       label: ['level','loader'],    phase: 'fluid',    px: 190, py: 770 },
+  { id: 'level-state',        label: ['level','state'],     phase: 'fluid',    px: 190, py: 818 },
+  { id: 'score-tracker',      label: ['score','tracker'],   phase: 'fluid',    px: 335, py: 818 },
+]
+
+const EDGES_DEF = [
+  { from: 'entity-schema',      to: 'entity-manager'     },
+  { from: 'entity-schema',      to: 'render-pipeline'    },
+  { from: 'entity-manager',     to: 'player'             },
+  { from: 'entity-manager',     to: 'enemy-spawner'      },
+  { from: 'player',             to: 'input-handler'      },
+  { from: 'player',             to: 'weapon-system'      },
+  { from: 'player',             to: 'shield-system'      },
+  { from: 'weapon-system',      to: 'bullet-pool'        },
+  { from: 'shield-system',      to: 'hit-detection'      },
+  { from: 'enemy-spawner',      to: 'formation-patterns' },
+  { from: 'enemy-spawner',      to: 'enemy-ai'           },
+  { from: 'formation-patterns', to: 'wave-controller'    },
+  { from: 'render-pipeline',    to: 'sprite-atlas'       },
+  { from: 'render-pipeline',    to: 'hud'                },
+  { from: 'sprite-atlas',       to: 'animation-system'   },
+  { from: 'hud',                to: 'score-display'      },
+  { from: 'hud',                to: 'health-bar'         },
+  { from: 'shared-mvc-base',    to: 'base-model'         },
+  { from: 'shared-mvc-base',    to: 'base-view'          },
+  { from: 'shared-mvc-base',    to: 'base-controller'    },
+  { from: 'enemy-schema',       to: 'enemy-registry'     },
+  { from: 'enemy-registry',     to: 'grunt'              },
+  { from: 'enemy-registry',     to: 'carrier'            },
+  { from: 'enemy-registry',     to: 'boss'               },
+  { from: 'grunt',              to: 'grunt-model'        },
+  { from: 'carrier',            to: 'carrier-model'      },
+  { from: 'boss',               to: 'boss-model'         },
+  { from: 'carrier-model',      to: 'minion-spawner'     },
+  { from: 'boss-model',         to: 'phase-tracker'      },
+  { from: 'phase-tracker',      to: 'phase-transition'   },
+  { from: 'level-schema',       to: 'level-loader'       },
+  { from: 'level-schema',       to: 'level-state'        },
+  { from: 'level-state',        to: 'score-tracker'      },
+  // Cross-cut
+  { from: 'level-loader',  to: 'wave-controller', crossCut: true },
+  { from: 'score-tracker', to: 'score-display',   crossCut: true },
+  { from: 'base-model',    to: 'grunt-model',     crossCut: true },
+  { from: 'base-model',    to: 'carrier-model',   crossCut: true },
+  { from: 'base-model',    to: 'boss-model',      crossCut: true },
+]
+
+// ── Thermal model ────────────────────────────────────────
+
+const HEAT = { 'salt-type-change': 2.5, 'fluid-recompile': 1.0 }
+const DECAY = 0.6, COOLING = 0.4
+
+function dependentCount(id) {
+  return EDGES_DEF.filter(e => e.from === id).length
+}
+function defaultThresholds(n) {
+  const base = 1 + n * 0.5
+  return { meltingPoint: base, boilingPoint: base * 2 }
+}
+
+let nodes, commitStep
+
+function initNodes() {
+  nodes = {}
+  for (const n of NODES_DEF) {
+    const { meltingPoint, boilingPoint } = defaultThresholds(dependentCount(n.id))
+    nodes[n.id] = { ...n, temperature: 0, meltingPoint, boilingPoint }
+  }
+  commitStep = 0
+}
+initNodes()
+
+function effectivePhase(node) {
+  if (node.temperature >= node.boilingPoint) return 'volatile'
+  if (node.temperature >= node.meltingPoint) return 'fluid'
+  return 'salt'
+}
+
+function propagate() {
+  const delta = {}
+  for (const id of Object.keys(nodes)) delta[id] = 0
+  for (const edge of EDGES_DEF) {
+    const src = nodes[edge.from]
+    if (src.temperature <= 0) continue
+    const conductance = edge.crossCut ? 0.6 : 0.8
+    delta[edge.to] += src.temperature * conductance * DECAY
+  }
+  for (const [id, d] of Object.entries(delta)) {
+    nodes[id].temperature += d
+  }
+}
+
+function cool() {
+  for (const node of Object.values(nodes)) {
+    node.temperature = Math.max(0, node.temperature - COOLING)
+  }
+}
+
+// ── Canvas rendering ─────────────────────────────────────
+
+const canvas = document.getElementById('simCanvas')
+const ctx = canvas.getContext('2d')
+
+// Scale canvas for device pixel ratio
+const dpr = window.devicePixelRatio || 1
+canvas.width  = CW * dpr
+canvas.height = CH * dpr
+canvas.style.width  = CW + 'px'
+canvas.style.height = CH + 'px'
+ctx.scale(dpr, dpr)
+
+const PHASE_COLORS = {
+  salt:     { r: 107, g: 83,  b: 68  },
+  fluid:    { r: 27,  g: 122, b: 104 },
+  volatile: { r: 217, g: 79,  b: 42  },
+}
+
+function tempColor(node) {
+  const t = Math.min(1, node.temperature / Math.max(0.01, node.boilingPoint))
+  const ep = effectivePhase(node)
+  const hot = { r: 217, g: 79, b: 42 }
+  const base = PHASE_COLORS[ep]
+  return `rgb(${Math.round(base.r+(hot.r-base.r)*t)},${Math.round(base.g+(hot.g-base.g)*t)},${Math.round(base.b+(hot.b-base.b)*t)})`
+}
+
+function drawArrow(sx, sy, dx, dy, color) {
+  const angle = Math.atan2(dy - sy, dx - sx)
+  const ar = R + 4
+  const ax = dx - ar * Math.cos(angle), ay = dy - ar * Math.sin(angle)
+  ctx.beginPath()
+  ctx.moveTo(ax, ay)
+  ctx.lineTo(ax - 7 * Math.cos(angle - 0.4), ay - 7 * Math.sin(angle - 0.4))
+  ctx.lineTo(ax - 7 * Math.cos(angle + 0.4), ay - 7 * Math.sin(angle + 0.4))
+  ctx.closePath()
+  ctx.fillStyle = color
+  ctx.fill()
+}
+
+function draw() {
+  ctx.clearRect(0, 0, CW, CH)
+
+  // Subsystem zone labels
+  const zones = [
+    { label: 'entity / player', y: 20 },
+    { label: 'render', y: 330 },
+    { label: 'enemy mvc', y: 478 },
+    { label: 'level', y: 738 },
+  ]
+  ctx.font = '10px -apple-system, system-ui, sans-serif'
+  ctx.textAlign = 'right'
+  ctx.textBaseline = 'top'
+  for (const z of zones) {
+    ctx.fillStyle = 'rgba(176,125,42,0.35)'
+    ctx.fillText(z.label.toUpperCase(), CW - 12, z.y)
+  }
+
+  // Edges
+  for (const edge of EDGES_DEF) {
+    const src = nodes[edge.from], dst = nodes[edge.to]
+    const sx = src.px, sy = src.py, dx = dst.px, dy = dst.py
+    // Shorten edge to node boundary
+    const angle = Math.atan2(dy - sy, dx - sx)
+    const ex = sx + R * Math.cos(angle), ey = sy + R * Math.sin(angle)
+    const ex2 = dx - R * Math.cos(angle), ey2 = dy - R * Math.sin(angle)
+
+    ctx.beginPath()
+    ctx.moveTo(ex, ey)
+    ctx.lineTo(ex2, ey2)
+    if (edge.crossCut) {
+      ctx.setLineDash([5, 4])
+      ctx.strokeStyle = 'rgba(184,125,42,0.55)'
+      ctx.lineWidth = 1.5
+    } else {
+      ctx.setLineDash([])
+      ctx.strokeStyle = '#EDE5D8'
+      ctx.lineWidth = 1.5
+    }
+    ctx.stroke()
+    ctx.setLineDash([])
+    drawArrow(sx, sy, dx, dy, edge.crossCut ? 'rgba(184,125,42,0.55)' : '#EDE5D8')
+  }
+
+  // Nodes
+  for (const n of NODES_DEF) {
+    const node = nodes[n.id]
+    const cx = n.px, cy = n.py
+    const col = tempColor(node)
+
+    // Glow
+    if (node.temperature > 0.05) {
+      const intensity = Math.min(1, node.temperature / node.boilingPoint)
+      const grd = ctx.createRadialGradient(cx, cy, R * 0.5, cx, cy, R * 2.2)
+      grd.addColorStop(0, `rgba(217,79,42,${intensity * 0.28})`)
+      grd.addColorStop(1, 'rgba(217,79,42,0)')
+      ctx.beginPath()
+      ctx.arc(cx, cy, R * 2.2, 0, Math.PI * 2)
+      ctx.fillStyle = grd
+      ctx.fill()
+    }
+
+    // Fill
+    ctx.beginPath()
+    ctx.arc(cx, cy, R, 0, Math.PI * 2)
+    ctx.fillStyle = col
+    ctx.fill()
+
+    // Border = intrinsic phase
+    ctx.beginPath()
+    ctx.arc(cx, cy, R, 0, Math.PI * 2)
+    if (n.phase === 'salt') {
+      ctx.setLineDash([])
+      ctx.lineWidth = 2.5
+    } else if (n.phase === 'fluid') {
+      ctx.setLineDash([5, 3])
+      ctx.lineWidth = 2
+    } else {
+      ctx.setLineDash([2, 4])
+      ctx.lineWidth = 1.5
+    }
+    ctx.strokeStyle = 'rgba(255,255,255,0.45)'
+    ctx.stroke()
+    ctx.setLineDash([])
+
+    // Label
+    ctx.textAlign = 'center'
+    ctx.fillStyle = 'rgba(255,255,255,0.92)'
+    if (n.label.length === 1) {
+      ctx.font = 'bold 9px -apple-system, system-ui, sans-serif'
+      ctx.textBaseline = 'middle'
+      ctx.fillText(n.label[0], cx, cy - 4)
+    } else {
+      ctx.font = 'bold 8px -apple-system, system-ui, sans-serif'
+      ctx.textBaseline = 'middle'
+      ctx.fillText(n.label[0], cx, cy - 7)
+      ctx.fillText(n.label[1], cx, cy + 2)
+    }
+
+    // Temperature
+    ctx.font = '7px ui-monospace, monospace'
+    ctx.fillStyle = 'rgba(255,255,255,0.6)'
+    ctx.fillText(`${node.temperature.toFixed(1)}°`, cx, cy + 13)
+  }
+
+  // Commit counter
+  ctx.fillStyle = '#A08070'
+  ctx.font = '11px ui-monospace, monospace'
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'top'
+  ctx.fillText(`commit ${commitStep}`, 12, 10)
+}
+
+// ── Log ──────────────────────────────────────────────────
+
+const log = document.getElementById('simLog')
+function addLog(msg, cls = '') {
+  const div = document.createElement('div')
+  div.className = `log-entry ${cls}`
+  div.textContent = msg
+  log.appendChild(div)
+  log.scrollTop = log.scrollHeight
+}
+
+// ── Controls ─────────────────────────────────────────────
+
+const prevEffective = {}
+for (const n of NODES_DEF) prevEffective[n.id] = 'salt'
+
+function fireEvent(nodeId, kind) {
+  const heat = HEAT[kind]
+  nodes[nodeId].temperature += heat
+  addLog(`+${heat.toFixed(1)} heat → ${nodeId} (${kind === 'salt-type-change' ? 'type change ✦' : 'recompile ↺'})`, 'heat')
+  checkTransitions()
+  draw()
+}
+
+function stepCommit() {
+  commitStep++
+  propagate()
+  cool()
+  checkTransitions()
+  addLog(`commit ${commitStep} — propagated + cooled`, 'step')
+  draw()
+}
+
+function checkTransitions() {
+  for (const n of NODES_DEF) {
+    const ep = effectivePhase(nodes[n.id])
+    if (ep !== prevEffective[n.id]) {
+      addLog(`⚡ ${n.id}: ${prevEffective[n.id]} → ${ep}`, 'transition')
+      prevEffective[n.id] = ep
+    }
+  }
+}
+
+function resetSim() {
+  initNodes()
+  for (const n of NODES_DEF) prevEffective[n.id] = 'salt'
+  log.innerHTML = '<div class="log-entry step">Reset. Ready.</div>'
+  draw()
+}
+
+// ── Click / tap ──────────────────────────────────────────
+
+function canvasCoords(e) {
+  const rect = canvas.getBoundingClientRect()
+  const scaleX = CW / rect.width
+  const scaleY = CH / rect.height
+  const clientX = e.touches ? e.touches[0].clientX : e.clientX
+  const clientY = e.touches ? e.touches[0].clientY : e.clientY
+  return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY }
+}
+
+function hitNode(x, y) {
+  for (const n of NODES_DEF) {
+    const dx = x - n.px, dy = y - n.py
+    if (dx * dx + dy * dy <= (R + 6) * (R + 6)) return n
+  }
+  return null
+}
+
+function handleTap(e) {
+  e.preventDefault()
+  const { x, y } = canvasCoords(e)
+  const n = hitNode(x, y)
+  if (!n) return
+  const kind = n.phase === 'salt' ? 'salt-type-change' : 'fluid-recompile'
+  fireEvent(n.id, kind)
+}
+
+canvas.addEventListener('click', handleTap)
+canvas.addEventListener('touchstart', handleTap, { passive: false })
+
+draw()
+
+// ── Modals ───────────────────────────────────────────────
+
+function openModal(id)  { document.getElementById(id).classList.add('open') }
+function closeModal(id) { document.getElementById(id).classList.remove('open') }
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.querySelectorAll('.modal-backdrop.open').forEach(m => m.classList.remove('open'))
+})
+</script>
+</body>
+</html>
