@@ -14,6 +14,33 @@ export interface Node {
   meta?: Record<string, unknown>
 }
 
+/**
+ * Bond types for module graphs.
+ *
+ * TODO(periodic-table): when feeding a TypeScript module graph in, classify
+ * each import edge by bond type. The TS compiler/language service has all the
+ * data needed; this field is the landing pad.
+ *
+ * - "import"   — one-directional import (ionic: asymmetric, brittle in long chains)
+ * - "type"     — type-only import (weaker ionic — no runtime charge transfer)
+ * - "reexport" — module re-exports the symbol (metallic: delocalised, conducts)
+ * - "shared"   — both files speak a common interface neither owns (covalent)
+ * - "ambient"  — reads/writes shared mutable state, e.g. a store (van der Waals)
+ *
+ * HINT: electronegativity of a node = (types it defines) / (types it consumes).
+ * High electronegativity → pulls imports toward itself. Low → donates outward.
+ *
+ * HINT: strongly connected components (Tarjan) on the import graph reveal
+ * intentional molecules — groups of files whose concept doesn't decompose.
+ * An SCC with a shared interface.ts at its nucleus is not a bug; it is the
+ * correct representation of the concept's topology.
+ *
+ * HINT: binding energy = cohesion within an SCC / coupling to nodes outside it.
+ * Moving away from the stable configuration (splitting or merging) costs energy.
+ * cf. nuclear binding energy curve — iron is the trough.
+ */
+export type BondType = "import" | "type" | "reexport" | "shared" | "ambient"
+
 export interface Edge {
   from: string
   to: string
@@ -21,6 +48,11 @@ export interface Edge {
   confidence: number
   phase: PhaseMarker
   predicate?: string
+  /**
+   * Bond type for module graphs. Optional — generic graphs leave this unset.
+   * TODO(periodic-table): populate from tsc AST analysis pass.
+   */
+  bondType?: BondType
   meta?: Record<string, unknown>
 }
 

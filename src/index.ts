@@ -12,7 +12,7 @@ export type { GasState, GasReading } from "./gas.js"
 export { readGas, readRepoGas } from "./gas.js"
 
 // Graph primitives
-export type { Node, Graph } from "./graph.js"
+export type { Node, Graph, BondType } from "./graph.js"
 export { createGraph, addNode, addEdge, edgesFrom, edgesTo, parallax } from "./graph.js"
 
 // Observer frames
