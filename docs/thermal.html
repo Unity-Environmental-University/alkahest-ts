@@ -601,10 +601,10 @@ function propagate() {
 // Shapes: 0=square(salt), 1=teardrop(fluid), 2=cloud(volatile)
 // shapeBlend returns a continuous 0–2 value from temperature
 
-// Fixed shape per intrinsic phase — no morphing
+// Shape = effective phase (what it's doing). Border = intrinsic phase (what it is).
 const PHASE_SHAPE = { salt: 0, fluid: 1, volatile: 2 }
 
-function shapeBlend(node) { return PHASE_SHAPE[node.phase] }
+function shapeBlend(node) { return PHASE_SHAPE[effectivePhase(node)] }
 
 function squareR(theta, R) {
   // Lp-norm with p=6 gives a smooth rounded square
