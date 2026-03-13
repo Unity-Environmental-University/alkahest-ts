@@ -830,6 +830,7 @@ function checkTransitions() {
 }
 
 function resetSim() {
+  cancelResume()
   stopPlay()
   initNodes()
   for (const n of GRAPH.nodes) prevEffective[n.id] = 'salt'
@@ -840,24 +841,26 @@ function resetSim() {
 // ── Play / Pause ──────────────────────────────────────────
 
 let playInterval = null
+let resumeTimeout = null
 
-function togglePlay() {
-  if (playInterval) {
-    stopPlay()
-  } else {
-    playInterval = setInterval(() => {
-      stepCommit()
-    }, 1000)
-    document.getElementById('playBtn').textContent = '⏸ Pause'
-  }
+function cancelResume() {
+  if (resumeTimeout) { clearTimeout(resumeTimeout); resumeTimeout = null }
+}
+
+function startPlay() {
+  if (playInterval) return
+  playInterval = setInterval(stepCommit, 1000)
+  document.getElementById('playBtn').textContent = '⏸ Pause'
 }
 
 function stopPlay() {
-  if (playInterval) {
-    clearInterval(playInterval)
-    playInterval = null
-  }
+  if (playInterval) { clearInterval(playInterval); playInterval = null }
   document.getElementById('playBtn').textContent = '▶ Play'
+}
+
+function togglePlay() {
+  cancelResume()           // manual intervention cancels any pending auto-resume
+  if (playInterval) stopPlay(); else startPlay()
 }
 
 // ── Click / tap ──────────────────────────────────────────
@@ -887,7 +890,16 @@ function handleTap(e) {
   if (!n) return
   const kind = n.ring === 0 ? 'salt-type-change' : 'fluid-recompile'
   fireEvent(n.id, kind)
-  if (!playInterval) togglePlay()
+
+  if (!playInterval && !resumeTimeout) {
+    // First tap — start playing
+    startPlay()
+  } else {
+    // Pause, cancel any pending resume, schedule fresh resume in 500ms
+    stopPlay()
+    cancelResume()
+    resumeTimeout = setTimeout(() => { resumeTimeout = null; startPlay() }, 500)
+  }
 }
 
 canvas.addEventListener('click', handleTap)
