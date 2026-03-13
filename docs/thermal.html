@@ -385,7 +385,7 @@ hr.full { max-width: none; }
 <script>
 // ── Graph definition ────────────────────────────────────
 
-const CW = 660, CH = 660
+const CW = 860, CH = 560
 
 const GRAPH = {
   nodes: [
@@ -530,21 +530,24 @@ function computeLayout() {
   for (const n of GRAPH.nodes) n.r = NODE_R[n.ring]
 }
 
-// Compute draw-time translation so graph centroid renders at canvas center.
-// Called once after layout; draw() applies it via ctx.save/translate/restore.
-function graphOffset() {
+// Scale + center: fit the settled layout into the canvas with margin.
+// Returns { tx, ty, scale } applied via ctx.save/translate/scale/restore.
+function graphTransform() {
+  const nodeMargin = NODE_R[0] + 10          // pad by largest node + breathing room
   const xs = GRAPH.nodes.map(n => n.px)
   const ys = GRAPH.nodes.map(n => n.py)
   const minX = Math.min(...xs), maxX = Math.max(...xs)
   const minY = Math.min(...ys), maxY = Math.max(...ys)
-  return {
-    x: CX - (minX + maxX) / 2,
-    y: CY - (minY + maxY) / 2,
-  }
+  const gW = maxX - minX, gH = maxY - minY
+  const available = Math.min(CW, CH) - nodeMargin * 2
+  const scale = Math.min(1, available / Math.max(gW, gH, 1))
+  const tx = CX - ((minX + maxX) / 2) * scale
+  const ty = CY - ((minY + maxY) / 2) * scale
+  return { tx, ty, scale }
 }
 
 computeLayout()
-const OFFSET = graphOffset()
+const TRANSFORM = graphTransform()
 
 // ── Thermal model ────────────────────────────────────────
 
@@ -696,7 +699,8 @@ function tempColor(node) {
 function draw() {
   ctx.clearRect(0, 0, CW, CH)
   ctx.save()
-  ctx.translate(OFFSET.x, OFFSET.y)
+  ctx.translate(TRANSFORM.tx, TRANSFORM.ty)
+  ctx.scale(TRANSFORM.scale, TRANSFORM.scale)
 
   // Edges
   for (const edge of GRAPH.edges) {
@@ -897,8 +901,8 @@ function canvasCoords(e) {
   const clientX = e.touches ? e.touches[0].clientX : e.clientX
   const clientY = e.touches ? e.touches[0].clientY : e.clientY
   return {
-    x: (clientX - rect.left) * scaleX - OFFSET.x,
-    y: (clientY - rect.top)  * scaleY - OFFSET.y,
+    x: ((clientX - rect.left) * scaleX - TRANSFORM.tx) / TRANSFORM.scale,
+    y: ((clientY - rect.top)  * scaleY - TRANSFORM.ty) / TRANSFORM.scale,
   }
 }
 
