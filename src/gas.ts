@@ -1,3 +1,5 @@
+import { reynoldsNumber } from "./entropy.js"
+
 /**
  * Ideal gas law for repositories.
  *
@@ -36,6 +38,8 @@ export interface GasState {
   lineCount: number
   /** Commits per day over recent window (default: 7 days) */
   activityRate: number
+  /** Viscosity [0,1] — resistance to flow. Default 0.3 if unknown. */
+  viscosity?: number
 }
 
 export interface GasReading {
@@ -44,6 +48,8 @@ export interface GasReading {
   n: number   // amount
   T: number   // temperature
   R: number   // constant (PV/nT)
+  /** Reynolds number — ρvL/μ where ρ=n/V, v=T, L=V, μ=viscosity */
+  Re: number
   phase: PhaseMarker
   /** Human-readable diagnosis */
   diagnosis: string
@@ -71,15 +77,17 @@ export function readGas(state: GasState, knownR?: number): GasReading {
   const V = Math.max(state.fileCount, 1)
   const n = Math.max(state.lineCount, 1)
   const T = Math.max(state.activityRate, 0.01)
+  const mu = state.viscosity ?? 0.3
 
   const R = (P * V) / (n * T)
 
-  // Phase from pressure and temperature together
-  const phase = classifyPhase(P, T, knownR ?? R)
+  // Reynolds number from gas law variables: ρ=n/V, v=T, L=V, μ=viscosity
+  const Re = reynoldsNumber({ density: n / V, velocity: T, length: V, viscosity: mu })
 
+  const phase = classifyPhase(P, T, knownR ?? R)
   const diagnosis = diagnose(state, P, V, n, T, phase)
 
-  return { P, V, n, T, R, phase, diagnosis }
+  return { P, V, n, T, R, Re, phase, diagnosis }
 }
 
 function classifyPhase(P: number, T: number, R: number): PhaseMarker {

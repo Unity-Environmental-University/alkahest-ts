@@ -16,7 +16,8 @@
  * Thermal mass: nodes with many dependents conduct heat more slowly (higher thresholds).
  */
 
-export type PhaseMarker = "volatile" | "fluid" | "salt"
+/** Four states of matter. Glass is not salt — it has no crystal structure. */
+export type PhaseMarker = "volatile" | "fluid" | "salt" | "glass"
 
 export interface ThermalNode {
   id: string
@@ -39,11 +40,13 @@ export interface ThermalGraph {
 }
 
 /** What a node is behaviorally doing, regardless of its material phase */
-export type EffectivePhase = "volatile" | "fluid" | "salt"
+export type EffectivePhase = PhaseMarker
 
 export function effectivePhase(node: ThermalNode): EffectivePhase {
   if (node.temperature >= node.boilingPoint) return "volatile"
   if (node.temperature >= node.meltingPoint) return "fluid"
+  // Glass: intrinsic phase is glass (high viscosity, amorphous) — cold but brittle
+  if (node.phase === "glass") return "glass"
   return "salt"
 }
 
